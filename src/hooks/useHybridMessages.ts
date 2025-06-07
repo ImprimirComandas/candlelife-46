@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -155,12 +154,12 @@ export const useHybridMessages = ({
           reply_to_id: msg.reply_to_id || undefined,
           deleted_at: msg.deleted_at || undefined,
           is_soft_deleted: msg.is_soft_deleted || false,
-          sender_username: msg.sender_username || undefined,
-          sender_avatar_url: msg.sender_avatar_url || undefined,
-          file_name: msg.file_name || undefined,
-          file_size: msg.file_size || undefined,
-          duration: msg.duration || undefined,
-          reactions: msg.reactions as any || []
+          sender_username: undefined, // Not fetched from DB
+          sender_avatar_url: undefined, // Not fetched from DB
+          file_name: undefined, // Not fetched from DB
+          file_size: undefined, // Not fetched from DB
+          duration: undefined, // Not fetched from DB
+          reactions: [] // Default empty array
         })).reverse();
 
         console.log(`✅ Loaded ${messages.length} messages for conversation`);
