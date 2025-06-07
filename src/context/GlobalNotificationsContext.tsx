@@ -250,10 +250,20 @@ export const GlobalNotificationsProvider: React.FC<{ children: React.ReactNode }
     }
   }, [preferences, user]);
 
-  const requestPermissions = useCallback(async () => {
+  const requestPermissions = useCallback(async (): Promise<boolean> => {
     try {
       if ('Notification' in window) {
+        console.log('🔔 Requesting notification permissions...');
         const permission = await Notification.requestPermission();
+        console.log('🔔 Notification permission result:', permission);
+        
+        if (permission === 'granted') {
+          toast({
+            title: "Notificações ativadas",
+            description: "Você receberá notificações de novas mensagens.",
+          });
+        }
+        
         return permission === 'granted';
       }
       return false;
@@ -261,7 +271,7 @@ export const GlobalNotificationsProvider: React.FC<{ children: React.ReactNode }
       console.error('Failed to request notification permissions:', error);
       return false;
     }
-  }, []);
+  }, [toast]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

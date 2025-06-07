@@ -1,6 +1,7 @@
 class AudioService {
   private audioContext: AudioContext | null = null;
   private notificationSound: HTMLAudioElement | null = null;
+  private isInitialized = false;
 
   constructor() {
     this.initializeAudio();
@@ -79,6 +80,36 @@ class AudioService {
     if (this.notificationSound) {
       this.notificationSound.volume = Math.max(0, Math.min(1, volume));
     }
+  }
+
+  initializeUserInteraction() {
+    if (this.isInitialized) return;
+    
+    console.log('🔊 Initializing audio service with user interaction');
+    
+    // Resume audio context if suspended
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume().then(() => {
+        console.log('✅ AudioContext resumed');
+      }).catch(error => {
+        console.warn('⚠️ Failed to resume AudioContext:', error);
+      });
+    }
+
+    // Re-initialize audio if needed
+    if (!this.audioContext) {
+      this.initializeAudio();
+    }
+
+    this.isInitialized = true;
+  }
+
+  getStatus() {
+    return {
+      audioContext: this.audioContext?.state || 'none',
+      notificationSound: !!this.notificationSound,
+      isInitialized: this.isInitialized
+    };
   }
 }
 

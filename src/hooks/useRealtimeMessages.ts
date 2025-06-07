@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { messageKeys } from '@/lib/query-keys';
 import { Message } from '@/types/messages';
+import { realtimeConnectionManager } from '@/services/RealtimeConnectionManager';
 
 interface UseRealtimeMessagesConfig {
   activeConversation?: string;
@@ -26,9 +27,10 @@ export const useRealtimeMessages = ({
 
   const cleanupChannel = useCallback(() => {
     if (channelRef.current) {
-      console.log('🧹 Cleaning up realtime channel');
+      console.log('🧹 Cleaning up realtime messages channel');
       try {
-        supabase.removeChannel(channelRef.current);
+        const channelName = `messages_${user?.id}`;
+        realtimeConnectionManager.removeChannel(channelName);
       } catch (error) {
         console.warn('Warning cleaning up channel:', error);
       }
@@ -36,7 +38,7 @@ export const useRealtimeMessages = ({
       setIsConnected(false);
     }
     isSetupRef.current = false;
-  }, []);
+  }, [user?.id]);
 
   const setupRealtimeSubscription = useCallback(() => {
     // Prevent multiple setups
@@ -56,9 +58,9 @@ export const useRealtimeMessages = ({
       cleanupChannel();
       
       const channelName = `messages_${user.id}`;
-      console.log('🔧 Setting up realtime messages channel:', channelName);
+      console.log('🔧 Setting up realtime messages channel with connection manager:', channelName);
 
-      const channel = supabase.channel(channelName);
+      const channel = realtimeConnectionManager.createChannel(channelName);
 
       // Subscribe to messages
       channel.on(

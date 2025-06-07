@@ -17,25 +17,35 @@ export const HybridNotifications = () => {
 
   // Monitor unread count and show notifications
   useEffect(() => {
-    const unreadCount = getTotalUnreadCount();
+    if (!user) return;
     
-    if (unreadCount > 0 && document.hidden) {
-      // Show browser notification when app is in background
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('CandleLife', {
-          body: `Você tem ${unreadCount} mensagem${unreadCount > 1 ? 's' : ''} não lida${unreadCount > 1 ? 's' : ''}`,
-          icon: '/favicon.ico',
-          tag: 'unread-messages',
-          requireInteraction: false
-        });
+    const checkUnreadMessages = () => {
+      const unreadCount = getTotalUnreadCount();
+      
+      if (unreadCount > 0 && document.hidden) {
+        // Show browser notification when app is in background
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const notification = new Notification('CandleLife', {
+            body: `Você tem ${unreadCount} mensagem${unreadCount > 1 ? 's' : ''} não lida${unreadCount > 1 ? 's' : ''}`,
+            icon: '/favicon.ico',
+            tag: 'unread-messages',
+            requireInteraction: false
+          });
 
-        setTimeout(() => notification.close(), 5000);
-        
-        // Play notification sound
-        audioService.playMessageSound();
+          setTimeout(() => notification.close(), 5000);
+          
+          // Play notification sound
+          audioService.playMessageSound();
+        }
       }
-    }
-  }, [getTotalUnreadCount]);
+    };
+
+    // Check immediately and then periodically
+    checkUnreadMessages();
+    const interval = setInterval(checkUnreadMessages, 30000);
+
+    return () => clearInterval(interval);
+  }, [user, getTotalUnreadCount]);
 
   // Request notification permissions on mount
   useEffect(() => {

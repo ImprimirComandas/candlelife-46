@@ -9,6 +9,9 @@ import { Toaster as Sonner } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import { RealtimeProvider } from "@/context/RealtimeContext";
 import { MessagesProvider } from "@/context/MessagesContext";
+import { NotificationInitializer } from "@/components/notifications/NotificationInitializer";
+import { HybridNotifications } from "@/components/notifications/HybridNotifications";
+import { ConnectionStatus } from "@/components/notifications/ConnectionStatus";
 
 import Login from "@/pages/Login";
 import SignUp from "@/pages/SignUp";
@@ -54,6 +57,9 @@ function App() {
             <RealtimeProvider>
               <MessagesProvider>
                 <GlobalNotificationsProvider>
+                  <NotificationInitializer />
+                  <HybridNotifications />
+                  <ConnectionStatus />
                   <Toaster />
                   <Sonner />
                   <Routes>

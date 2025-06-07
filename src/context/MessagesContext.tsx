@@ -116,8 +116,11 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Auto-request permissions when user logs in
   useEffect(() => {
     if (user) {
+      console.log('👤 User logged in, setting up notifications...');
       setTimeout(() => {
-        requestNotificationPermissions();
+        requestNotificationPermissions().then(granted => {
+          console.log('🔔 Notification permissions requested:', granted);
+        });
       }, 2000);
     }
   }, [user, requestNotificationPermissions]);
