@@ -10,6 +10,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { Toaster } from "@/components/ui/toaster";
 import { MessagesProvider } from './context/MessagesContext';
 import { RealtimeProvider } from './context/RealtimeContext';
+import AppLayout from './components/layout/AppLayout';
 
 const queryClient = new QueryClient();
 
@@ -23,10 +24,11 @@ function App() {
               <div className="min-h-screen bg-background">
                 <Routes>
                   <Route path="/login" element={<Login />} />
-                  <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                  <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-                  <Route path="/chat/:userId" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
+                  <Route path="/*" element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  } />
                 </Routes>
                 <Toaster />
               </div>
