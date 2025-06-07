@@ -3,7 +3,7 @@ import { ChatMessages } from "./ChatMessages";
 import { TypingIndicator } from "./TypingIndicator";
 import { ChatInput } from "./ChatInput";
 import { useAuth } from "@/context/AuthContext";
-import { Message } from "@/hooks/messages/types";
+import { Message } from "@/types/messages";
 
 interface ChatContentProps {
   messages: Message[];

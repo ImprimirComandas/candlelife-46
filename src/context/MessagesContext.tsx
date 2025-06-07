@@ -16,6 +16,8 @@ interface MessagesContextType {
   markConversationAsRead: (userId: string) => Promise<void>;
   sendMessage: (recipientId: string, content: string, attachment?: File) => Promise<void>;
   clearConversation: (userId: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  editMessage: (messageId: string, content: string) => Promise<void>;
   
   // Hooks for components
   useChatUsers: ReturnType<typeof useMessages>['useChatUsers'];
@@ -26,11 +28,6 @@ interface MessagesContextType {
   chatUsers: ChatUser[];
   isLoadingChatUsers: boolean;
   getTotalUnreadCount: () => number;
-  
-  // Direct functions for compatibility
-  getConversation: ReturnType<typeof useMessages>['getConversation'];
-  deleteMessage: ReturnType<typeof useMessages>['deleteMessage'];
-  editMessage: ReturnType<typeof useMessages>['editMessage'];
 }
 
 const MessagesContext = createContext<MessagesContextType | undefined>(undefined);
@@ -46,18 +43,19 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     useSendMessage,
     useMarkConversationAsRead,
     useClearConversation,
+    useDeleteMessage,
+    useEditMessage,
     showNotification,
     chatUsers,
     isLoadingChatUsers,
-    getTotalUnreadCount,
-    getConversation,
-    deleteMessage,
-    editMessage
+    getTotalUnreadCount
   } = useMessages();
 
   const sendMessage = useSendMessage();
   const markAsRead = useMarkConversationAsRead();
   const clearChat = useClearConversation();
+  const deleteMsg = useDeleteMessage();
+  const editMsg = useEditMessage();
 
   // Handle new messages from realtime
   const handleNewMessage = useCallback((message: Message) => {
@@ -141,6 +139,24 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   }, [clearChat]);
 
+  const deleteMessageAction = useCallback(async (messageId: string) => {
+    return new Promise<void>((resolve, reject) => {
+      deleteMsg.mutate(messageId, {
+        onSuccess: () => resolve(),
+        onError: reject
+      });
+    });
+  }, [deleteMsg]);
+
+  const editMessageAction = useCallback(async (messageId: string, content: string) => {
+    return new Promise<void>((resolve, reject) => {
+      editMsg.mutate({ messageId, content }, {
+        onSuccess: () => resolve(),
+        onError: reject
+      });
+    });
+  }, [editMsg]);
+
   return (
     <MessagesContext.Provider value={{
       activeConversation,
@@ -150,15 +166,14 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       markConversationAsRead,
       sendMessage: sendMessageAction,
       clearConversation: clearConversationAction,
+      deleteMessage: deleteMessageAction,
+      editMessage: editMessageAction,
       useChatUsers,
       useConversation,
       showNotification,
       chatUsers,
       isLoadingChatUsers,
-      getTotalUnreadCount,
-      getConversation,
-      deleteMessage,
-      editMessage
+      getTotalUnreadCount
     }}>
       {children}
     </MessagesContext.Provider>

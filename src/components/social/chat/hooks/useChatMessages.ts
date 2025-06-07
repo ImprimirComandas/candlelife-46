@@ -88,9 +88,7 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     try {
       console.log("Sending message...", { recipientId, content, attachment });
       
-      const attachmentUrl = attachment ? URL.createObjectURL(attachment) : undefined;
-      
-      await sendMessage(recipientId, content.trim() || " ", attachmentUrl);
+      await sendMessage(recipientId, content.trim() || " ", attachment);
       console.log("Message sent successfully");
       sendTypingStatus(recipientId, false);
       refetch();
