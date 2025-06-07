@@ -9,15 +9,28 @@ import {
   MessageSquare,
   Flame,
   LogOut,
+  Target,
+  Globe,
+  TrendingUp,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
+import { 
+  Sidebar, 
+  SidebarContent, 
+  SidebarFooter, 
+  SidebarHeader, 
+  SidebarMenu, 
+  SidebarMenuButton, 
+  SidebarMenuItem, 
+  SidebarGroup, 
+  SidebarGroupContent,
+  SidebarGroupLabel 
+} from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Target } from "lucide-react";
 
 export function AppSidebar() {
   const location = useLocation();
@@ -33,14 +46,25 @@ export function AppSidebar() {
     }
   };
 
-  const menuItems = [
+  const mainMenuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  ];
+
+  const financialMenuItems = [
     { icon: CreditCard, label: "Transações", href: "/transactions" },
-    { icon: Target, label: "Metas", href: "/goals" },
-    { icon: Receipt, label: "Faturadas", href: "/invoiced" },
+    { icon: TrendingUp, label: "Receitas", href: "/transactions?type=income" },
     { icon: TrendingDown, label: "Despesas", href: "/expenses" },
+    { icon: Receipt, label: "Faturadas", href: "/invoiced" },
+    { icon: Target, label: "Metas", href: "/goals" },
+  ];
+
+  const managementMenuItems = [
     { icon: Users, label: "Clientes", href: "/clients" },
-    { icon: MessageSquare, label: "Comunidade", href: "/social" },
+    { icon: Globe, label: "Comunidade", href: "/social" },
+    { icon: MessageSquare, label: "Chat", href: "/chat" },
+  ];
+
+  const systemMenuItems = [
     { icon: Settings, label: "Configurações", href: "/settings" },
   ];
 
@@ -58,11 +82,83 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-4 py-6">
+      <SidebarContent className="px-4 py-6 space-y-6">
+        {/* Main Navigation */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {mainMenuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location.pathname === item.href}
+                    className="w-full justify-start gap-3 px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                  >
+                    <Link to={item.href} className="flex items-center gap-3">
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Financial Management */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Financeiro</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {financialMenuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location.pathname === item.href || 
+                             (item.href.includes('?type=income') && location.pathname === '/transactions' && location.search.includes('type=income'))}
+                    className="w-full justify-start gap-3 px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                  >
+                    <Link to={item.href} className="flex items-center gap-3">
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Business Management */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Gestão</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {managementMenuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location.pathname === item.href || 
+                             (item.href === "/chat" && location.pathname.startsWith("/chat"))}
+                    className="w-full justify-start gap-3 px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                  >
+                    <Link to={item.href} className="flex items-center gap-3">
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* System */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {systemMenuItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton 
                     asChild 

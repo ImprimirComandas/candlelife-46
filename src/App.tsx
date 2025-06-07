@@ -11,6 +11,14 @@ import Contact from './pages/Contact';
 import Support from './pages/Support';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import Transactions from './pages/Transactions';
+import Expenses from './pages/Expenses';
+import Goals from './pages/Goals';
+import Clients from './pages/Clients';
+import Social from './pages/Social';
+import Settings from './pages/Settings';
+import InvoicedTransactions from './pages/InvoicedTransactions';
+import AppLayout from './components/layout/AppLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { Toaster } from "@/components/ui/toaster";
 import { MessagesProvider } from './context/MessagesContext';
@@ -28,12 +36,23 @@ function App() {
               <div className="min-h-screen bg-background">
                 <Routes>
                   <Route path="/login" element={<Login />} />
-                  <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                  <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-                  <Route path="/chat/:userId" element={<ProtectedRoute><ChatConversationPage /></ProtectedRoute>} />
                   
-                  {/* Footer pages */}
+                  {/* Protected routes with AppLayout */}
+                  <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="transactions" element={<Transactions />} />
+                    <Route path="expenses" element={<Expenses />} />
+                    <Route path="goals" element={<Goals />} />
+                    <Route path="clients" element={<Clients />} />
+                    <Route path="social" element={<Social />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="invoiced" element={<InvoicedTransactions />} />
+                    <Route path="chat" element={<ChatPage />} />
+                    <Route path="chat/:userId" element={<ChatConversationPage />} />
+                  </Route>
+                  
+                  {/* Footer pages (standalone) */}
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/support" element={<Support />} />
