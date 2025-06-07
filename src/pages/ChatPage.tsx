@@ -7,21 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Search, MessageCircle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner";
-import { ChatModal } from "@/components/chat/ChatModal";
-import { useChatSystem } from "@/hooks/useChatSystem";
+import { useSimpleChat } from "@/hooks/useSimpleChat";
 
 const ChatPage = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   
   const { 
     chatUsers, 
     isLoadingChatUsers, 
-    getTotalUnreadCount,
-    isConnected
-  } = useChatSystem();
+    getTotalUnreadCount
+  } = useSimpleChat();
 
   const filteredUsers = chatUsers?.filter(user =>
     user.username.toLowerCase().includes(searchQuery.toLowerCase())
@@ -30,8 +27,12 @@ const ChatPage = () => {
   const totalUnread = getTotalUnreadCount();
 
   const handleUserSelect = (user: any) => {
-    setSelectedUser(user);
-    setIsChatOpen(true);
+    navigate(`/chat/${user.id}`, { 
+      state: { 
+        username: user.username, 
+        avatar_url: user.avatar_url 
+      } 
+    });
   };
 
   const formatLastMessage = (message: any) => {
@@ -87,8 +88,8 @@ const ChatPage = () => {
           <div className="flex-1">
             <h1 className="text-xl font-semibold">Conversas</h1>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span>{isConnected ? 'Online' : 'Desconectado'}</span>
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span>Online</span>
               {totalUnread > 0 && (
                 <span>• {totalUnread} mensagens não lidas</span>
               )}
@@ -175,17 +176,6 @@ const ChatPage = () => {
           </div>
         )}
       </div>
-
-      {/* Chat Modal with full functionality */}
-      {selectedUser && (
-        <ChatModal
-          isOpen={isChatOpen}
-          onOpenChange={setIsChatOpen}
-          recipientId={selectedUser.id}
-          recipientName={selectedUser.username}
-          recipientAvatar={selectedUser.avatar_url}
-        />
-      )}
     </div>
   );
 };
