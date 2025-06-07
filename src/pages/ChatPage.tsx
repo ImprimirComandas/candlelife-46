@@ -1,25 +1,27 @@
 
 import { useState } from "react";
-import { useOptimizedMessages } from "@/hooks/useOptimizedMessages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Search, MessageCircle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useNative } from "@/hooks/useNative";
 import { Spinner } from "@/components/ui/spinner";
+import { SimpleChatModal } from "@/components/chat/SimpleChatModal";
+import { useChatSystem } from "@/hooks/useChatSystem";
 
 const ChatPage = () => {
   const navigate = useNavigate();
-  const { hapticFeedback } = useNative();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   
   const { 
     chatUsers, 
     isLoadingChatUsers, 
-    getTotalUnreadCount 
-  } = useOptimizedMessages();
+    getTotalUnreadCount,
+    isConnected
+  } = useChatSystem();
 
   const filteredUsers = chatUsers?.filter(user =>
     user.username.toLowerCase().includes(searchQuery.toLowerCase())
@@ -27,9 +29,9 @@ const ChatPage = () => {
 
   const totalUnread = getTotalUnreadCount();
 
-  const handleUserSelect = (userId: string) => {
-    hapticFeedback('light');
-    navigate(`/chat/${userId}`);
+  const handleUserSelect = (user: any) => {
+    setSelectedUser(user);
+    setIsChatOpen(true);
   };
 
   const formatLastMessage = (message: any) => {
@@ -63,7 +65,7 @@ const ChatPage = () => {
 
   if (isLoadingChatUsers) {
     return (
-      <div className="flex flex-col h-full items-center justify-center p-6 safe-area-top">
+      <div className="flex flex-col h-full items-center justify-center p-6">
         <Spinner className="w-8 h-8 mb-4" />
         <p className="text-muted-foreground">Carregando conversas...</p>
       </div>
@@ -72,24 +74,25 @@ const ChatPage = () => {
 
   return (
     <div className="flex flex-col h-full max-w-md mx-auto">
-      {/* Header with safe area */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50 p-4 safe-area-top">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50 p-4">
         <div className="flex items-center gap-3 mb-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/dashboard')}
-            className="native-transition"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
             <h1 className="text-xl font-semibold">Conversas</h1>
-            {totalUnread > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {totalUnread} mensagens não lidas
-              </p>
-            )}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span>{isConnected ? 'Online' : 'Desconectado'}</span>
+              {totalUnread > 0 && (
+                <span>• {totalUnread} mensagens não lidas</span>
+              )}
+            </div>
           </div>
         </div>
         
@@ -105,8 +108,8 @@ const ChatPage = () => {
         </div>
       </div>
 
-      {/* Chat List with safe area bottom */}
-      <div className="flex-1 overflow-auto safe-area-bottom">
+      {/* Chat List */}
+      <div className="flex-1 overflow-auto">
         {filteredUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
             <MessageCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -125,8 +128,8 @@ const ChatPage = () => {
             {filteredUsers.map((user) => (
               <button
                 key={user.id}
-                onClick={() => handleUserSelect(user.id)}
-                className="w-full p-4 flex items-center gap-3 hover:bg-accent/50 transition-colors text-left native-transition active:scale-95"
+                onClick={() => handleUserSelect(user)}
+                className="w-full p-4 flex items-center gap-3 hover:bg-accent/50 transition-colors text-left"
               >
                 <div className="relative">
                   <Avatar className="h-12 w-12">
@@ -172,6 +175,17 @@ const ChatPage = () => {
           </div>
         )}
       </div>
+
+      {/* Chat Modal */}
+      {selectedUser && (
+        <SimpleChatModal
+          isOpen={isChatOpen}
+          onOpenChange={setIsChatOpen}
+          recipientId={selectedUser.id}
+          recipientName={selectedUser.username}
+          recipientAvatar={selectedUser.avatar_url}
+        />
+      )}
     </div>
   );
 };

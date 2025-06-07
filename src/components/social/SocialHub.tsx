@@ -3,14 +3,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { usePosts } from "@/hooks/usePosts";
-import { useAdvancedMessages } from "@/hooks/useAdvancedMessages";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { SocialHeader } from "./SocialHeader";
 import { FeedContent } from "./FeedContent";
-import { ChatList } from "./chat/ChatList";
-import { EnhancedChatModal } from "../chat/enhanced/EnhancedChatModal";
-import { NotificationCenter } from "./NotificationCenter";
 import { useNavigate } from "react-router-dom";
 import { ErrorMessage } from "@/components/ui/error-message";
 
@@ -21,19 +16,6 @@ const SocialHub = () => {
   const { posts, isLoadingPosts, postsError, refetchPosts } = usePosts();
   
   const [editingPost, setEditingPost] = useState<any>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [selectedChatUser, setSelectedChatUser] = useState<any>(null);
-  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
-
-  // Advanced messages hook for real-time functionality
-  const { 
-    useChatUsers, 
-    getTotalUnreadCount 
-  } = useAdvancedMessages();
-  
-  const chatUsersQuery = useChatUsers();
-  const totalUnreadMessages = getTotalUnreadCount();
-  const chatUsers = chatUsersQuery.data || [];
 
   // Verificar autenticação
   useEffect(() => {
@@ -60,24 +42,6 @@ const SocialHub = () => {
     }
   }, [postsError, refetchPosts, user]);
   
-  const openChat = (userId: string, userName: string, userAvatar?: string) => {
-    if (userId === user?.id) {
-      toast({
-        title: "Operação não permitida",
-        description: "Você não pode iniciar um chat consigo mesmo.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setSelectedChatUser({ 
-      id: userId, 
-      username: userName, 
-      avatar_url: userAvatar || "" 
-    });
-    setIsChatOpen(true);
-  };
-  
   const handleEditPost = (post: any) => {
     setEditingPost(post);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -98,11 +62,7 @@ const SocialHub = () => {
   if (postsError && !isLoadingPosts) {
     return (
       <div className="w-full space-y-8 p-4">
-        <SocialHeader 
-          openChat={openChat}
-          totalUnreadMessages={totalUnreadMessages}
-          onNotificationCenterToggle={() => setIsNotificationCenterOpen(!isNotificationCenterOpen)}
-        />
+        <SocialHeader />
         
         <ErrorMessage
           title="Erro ao carregar publicações"
@@ -115,27 +75,12 @@ const SocialHub = () => {
 
   return (
     <div className="w-full space-y-4 sm:space-y-8 p-2 sm:p-4">
-      <SocialHeader 
-        openChat={openChat}
-        totalUnreadMessages={totalUnreadMessages}
-        onNotificationCenterToggle={() => setIsNotificationCenterOpen(!isNotificationCenterOpen)}
-      />
+      <SocialHeader />
 
       <Tabs defaultValue="feed" className="w-full">
-        <TabsList className="mb-4 sm:mb-6 grid w-full grid-cols-3">
+        <TabsList className="mb-4 sm:mb-6 grid w-full grid-cols-2">
           <TabsTrigger value="feed" className="text-sm">
             Feed da Comunidade
-          </TabsTrigger>
-          <TabsTrigger value="messages" className="text-sm relative">
-            Mensagens
-            {totalUnreadMessages > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
-              >
-                {totalUnreadMessages > 9 ? "9+" : totalUnreadMessages}
-              </Badge>
-            )}
           </TabsTrigger>
           <TabsTrigger value="my-posts" className="text-sm">
             Minhas Publicações
@@ -149,15 +94,6 @@ const SocialHub = () => {
             editingPost={editingPost}
             onEdit={handleEditPost}
             onCancelEdit={handleCancelEdit}
-            openChat={openChat}
-          />
-        </TabsContent>
-
-        <TabsContent value="messages" className="w-full">
-          <ChatList 
-            chatUsers={chatUsers}
-            isLoading={chatUsersQuery.isLoading}
-            onSelectUser={(user) => openChat(user.id, user.username, user.avatar_url)}
           />
         </TabsContent>
         
@@ -170,25 +106,9 @@ const SocialHub = () => {
             onCancelEdit={handleCancelEdit}
             showMyPostsOnly={true}
             currentUserId={user?.id}
-            openChat={openChat}
           />
         </TabsContent>
       </Tabs>
-
-      {selectedChatUser && (
-        <EnhancedChatModal 
-          isOpen={isChatOpen}
-          onOpenChange={setIsChatOpen}
-          recipientId={selectedChatUser.id}
-          recipientName={selectedChatUser.username}
-          recipientAvatar={selectedChatUser.avatar_url}
-        />
-      )}
-
-      <NotificationCenter 
-        isOpen={isNotificationCenterOpen}
-        onOpenChange={setIsNotificationCenterOpen}
-      />
     </div>
   );
 };
