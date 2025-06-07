@@ -14,7 +14,6 @@ type FeedContentProps = {
   onCancelEdit: () => void;
   showMyPostsOnly?: boolean;
   currentUserId?: string;
-  openChat: (userId: string, userName: string, userAvatar?: string) => void;
 };
 
 export function FeedContent({
@@ -24,8 +23,7 @@ export function FeedContent({
   onEdit,
   onCancelEdit,
   showMyPostsOnly = false,
-  currentUserId,
-  openChat
+  currentUserId
 }: FeedContentProps) {
   const { user } = useAuth();
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
@@ -37,6 +35,11 @@ export function FeedContent({
   
   const toggleExpanded = (postId: string) => {
     setExpandedPostId(expandedPostId === postId ? null : postId);
+  };
+
+  // Função placeholder para openChat (não usada mais)
+  const handleOpenChat = (userId: string, userName: string, userAvatar?: string) => {
+    console.log("Chat functionality removed from social area");
   };
 
   return (
@@ -79,7 +82,7 @@ export function FeedContent({
               toggleExpanded={() => toggleExpanded(post.id)}
               onEdit={() => onEdit(post)}
               currentUserId={user?.id}
-              openChat={openChat}
+              openChat={handleOpenChat}
             />
           ))}
         </div>

@@ -124,8 +124,14 @@ export const useChatSystem = () => {
         const { data: messages, error } = await supabase
           .from("messages")
           .select(`
-            *,
-            sender:profiles!messages_sender_id_fkey(username, avatar_url)
+            id,
+            sender_id,
+            recipient_id,
+            content,
+            created_at,
+            read,
+            read_at,
+            attachment_url
           `)
           .or(`and(sender_id.eq.${user.id},recipient_id.eq.${recipientId}),and(sender_id.eq.${recipientId},recipient_id.eq.${user.id})`)
           .eq("deleted_by_recipient", false)
@@ -141,10 +147,8 @@ export const useChatSystem = () => {
           content: msg.content,
           created_at: msg.created_at,
           read: msg.read,
-          read_at: msg.read_at,
-          attachment_url: msg.attachment_url,
-          sender_username: msg.sender?.username,
-          sender_avatar_url: msg.sender?.avatar_url,
+          read_at: msg.read_at || undefined,
+          attachment_url: msg.attachment_url || undefined,
         })) || [];
       },
       enabled: !!user?.id && !!recipientId,
