@@ -1,176 +1,115 @@
-
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/hooks/use-toast";
-import { useEffect, useRef } from "react";
-
-export interface SimpleChatMessage {
-  id: string;
-  sender_id: string;
-  recipient_id: string;
-  content: string;
-  created_at: string;
-  read: boolean;
-  read_at?: string;
-  attachment_url?: string;
-}
-
-export interface SimpleChatUser {
-  id: string;
-  username: string;
-  avatar_url?: string;
-  unread_count: number;
-  last_message?: SimpleChatMessage;
-}
+import { Message, ChatUser, MessageType } from '@/types/messages';
+import { FileUploadService } from '@/services/FileUploadService';
+import { notificationService } from '@/services/NotificationService';
 
 export const useSimpleChat = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const [conversations, setConversations] = useState<ChatUser[]>([]);
   const queryClient = useQueryClient();
-  const channelRef = useRef<any>(null);
+  const { user } = useAuth();
 
-  // Get chat users
-  const { data: chatUsers = [], isLoading: isLoadingChatUsers, refetch: refetchChatUsers } = useQuery({
-    queryKey: ["simple-chat-users", user?.id],
-    queryFn: async (): Promise<SimpleChatUser[]> => {
-      if (!user?.id) return [];
+  const getConversations = () => {
+    return useQuery({
+      queryKey: ['conversations'],
+      queryFn: async () => {
+        if (!user) return [];
 
-      const { data: messages, error } = await supabase
-        .from("messages")
-        .select(`
-          sender_id,
-          recipient_id,
-          content,
-          created_at,
-          read
-        `)
-        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-        .eq("deleted_by_recipient", false)
-        .eq("is_soft_deleted", false)
-        .order("created_at", { ascending: false });
+        const { data: messages } = await supabase
+          .from('messages')
+          .select('sender_id, recipient_id')
+          .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-        return [];
-      }
+        if (!messages) return [];
 
-      // Get unique user IDs
-      const userIds = new Set<string>();
-      messages?.forEach(msg => {
-        if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
-        if (msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
-      });
+        const userIds = new Set<string>();
+        messages.forEach(message => {
+          if (message.sender_id !== user.id) userIds.add(message.sender_id);
+          if (message.recipient_id !== user.id) userIds.add(message.recipient_id);
+        });
 
-      if (userIds.size === 0) return [];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', Array.from(userIds));
 
-      // Get user profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url")
-        .in("id", Array.from(userIds));
+        if (!profiles) return [];
 
-      if (profilesError) {
-        console.error("Error fetching profiles:", profilesError);
-        return [];
-      }
-
-      // Calculate unread counts and last messages
-      const chatUsers: SimpleChatUser[] = profiles?.map(profile => {
-        const userMessages = messages?.filter(msg => 
-          (msg.sender_id === profile.id && msg.recipient_id === user.id) ||
-          (msg.sender_id === user.id && msg.recipient_id === profile.id)
-        ) || [];
-
-        const unreadCount = userMessages.filter(msg => 
-          msg.recipient_id === user.id && !msg.read
-        ).length;
-
-        const lastMessage = userMessages[0] ? {
-          id: `${userMessages[0].sender_id}-${userMessages[0].created_at}`,
-          sender_id: userMessages[0].sender_id,
-          recipient_id: userMessages[0].recipient_id,
-          content: userMessages[0].content,
-          created_at: userMessages[0].created_at,
-          read: userMessages[0].read,
-        } as SimpleChatMessage : undefined;
-
-        return {
+        const users: ChatUser[] = profiles.map(profile => ({
           id: profile.id,
           username: profile.username,
-          avatar_url: profile.avatar_url || undefined,
-          unread_count: unreadCount,
-          last_message: lastMessage
-        };
-      }) || [];
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          email: profile.email || '',
+          created_at: profile.created_at,
+          updated_at: profile.updated_at
+        }));
 
-      return chatUsers.sort((a, b) => {
-        const aTime = a.last_message?.created_at || '';
-        const bTime = b.last_message?.created_at || '';
-        return new Date(bTime).getTime() - new Date(aTime).getTime();
-      });
-    },
-    enabled: !!user?.id,
-    staleTime: 30000
-  });
-
-  // Get conversation messages
-  const getConversationMessages = (recipientId: string) => {
-    return useQuery({
-      queryKey: ["simple-conversation", user?.id, recipientId],
-      queryFn: async (): Promise<SimpleChatMessage[]> => {
-        if (!user?.id || !recipientId) return [];
-
-        const { data: messages, error } = await supabase
-          .from("messages")
-          .select(`
-            id,
-            sender_id,
-            recipient_id,
-            content,
-            created_at,
-            read,
-            read_at,
-            attachment_url
-          `)
-          .or(`and(sender_id.eq.${user.id},recipient_id.eq.${recipientId}),and(sender_id.eq.${recipientId},recipient_id.eq.${user.id})`)
-          .eq("deleted_by_recipient", false)
-          .eq("is_soft_deleted", false)
-          .order("created_at", { ascending: true });
-
-        if (error) {
-          console.error("Error fetching conversation:", error);
-          return [];
-        }
-
-        return messages?.map(msg => ({
-          id: msg.id,
-          sender_id: msg.sender_id,
-          recipient_id: msg.recipient_id,
-          content: msg.content,
-          created_at: msg.created_at,
-          read: msg.read,
-          read_at: msg.read_at || undefined,
-          attachment_url: msg.attachment_url || undefined,
-        })) || [];
+        setConversations(users);
+        return users;
       },
-      enabled: !!user?.id && !!recipientId,
-      refetchInterval: 3000, // Poll every 3 seconds for new messages
-      staleTime: 0
     });
   };
 
-  // Send message mutation
+  const getConversationMessages = (userId: string) => {
+    return useQuery({
+      queryKey: ['messages', userId],
+      queryFn: async () => {
+        if (!user) return [];
+
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${user.id},sender_id.eq.${userId}`)
+          .or(`recipient_id.eq.${user.id},recipient_id.eq.${userId}`)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data || [];
+      },
+    });
+  };
+
   const sendMessage = useMutation({
-    mutationFn: async ({ recipientId, content }: { recipientId: string; content: string }) => {
-      if (!user?.id) throw new Error("User not authenticated");
+    mutationFn: async ({ 
+      recipientId, 
+      content, 
+      attachment 
+    }: { 
+      recipientId: string; 
+      content: string; 
+      attachment?: File;
+    }) => {
+      if (!user) throw new Error('Usuário não autenticado');
+
+      let attachmentUrl: string | undefined;
+      let fileName: string | undefined;
+      let fileSize: number | undefined;
+
+      // Upload do arquivo se fornecido
+      if (attachment) {
+        try {
+          attachmentUrl = await FileUploadService.uploadMessageAttachment(attachment, user.id);
+          fileName = attachment.name;
+          fileSize = attachment.size;
+        } catch (error) {
+          console.error('Erro no upload do arquivo:', error);
+          throw new Error('Falha no upload do arquivo');
+        }
+      }
 
       const { data, error } = await supabase
-        .from("messages")
+        .from('messages')
         .insert({
           sender_id: user.id,
           recipient_id: recipientId,
-          content
+          content,
+          message_type: attachment ? MessageType.FILE : MessageType.TEXT,
+          attachment_url: attachmentUrl,
+          file_name: fileName,
+          file_size: fileSize
         })
         .select()
         .single();
@@ -179,99 +118,36 @@ export const useSimpleChat = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["simple-chat-users"] });
-      queryClient.invalidateQueries({ queryKey: ["simple-conversation"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro",
-        description: `Falha ao enviar mensagem: ${error.message}`,
-        variant: "destructive"
-      });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
     }
   });
 
-  // Mark as read mutation
   const markAsRead = useMutation({
-    mutationFn: async (senderId: string) => {
-      if (!user?.id) throw new Error("User not authenticated");
+    mutationFn: async (userId: string) => {
+      if (!user) throw new Error('Usuário não autenticado');
 
-      const { error } = await supabase.rpc('mark_conversation_as_read_v2', {
-        p_recipient_id: user.id,
-        p_sender_id: senderId
-      });
+      const { data, error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('recipient_id', user.id)
+        .eq('sender_id', userId)
+        .neq('read', true);
 
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["simple-chat-users"] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+    },
   });
 
-  // Setup realtime
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase.channel(`simple_chat_${user.id}`);
-
-    channel.on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `or(sender_id.eq.${user.id},recipient_id.eq.${user.id})`
-      },
-      (payload) => {
-        console.log('📩 New message received:', payload);
-        queryClient.invalidateQueries({ queryKey: ["simple-chat-users"] });
-        queryClient.invalidateQueries({ queryKey: ["simple-conversation"] });
-        
-        if (payload.new.sender_id !== user.id) {
-          toast({
-            title: "Nova mensagem",
-            description: "Você recebeu uma nova mensagem"
-          });
-        }
-      }
-    );
-
-    channel.on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'messages',
-        filter: `or(sender_id.eq.${user.id},recipient_id.eq.${user.id})`
-      },
-      (payload) => {
-        console.log('📝 Message updated:', payload);
-        queryClient.invalidateQueries({ queryKey: ["simple-conversation"] });
-      }
-    );
-
-    channel.subscribe();
-    channelRef.current = channel;
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [user?.id, queryClient, toast]);
-
-  const getTotalUnreadCount = (): number => {
-    return chatUsers.reduce((total, user) => total + (user.unread_count || 0), 0);
-  };
-
   return {
-    chatUsers,
-    isLoadingChatUsers,
-    refetchChatUsers,
+    conversations,
+    getConversations,
     getConversationMessages,
     sendMessage,
-    markAsRead,
-    getTotalUnreadCount
+    markAsRead
   };
 };

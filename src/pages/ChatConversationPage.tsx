@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +14,8 @@ import { useOfflineChat } from "@/hooks/useOfflineChat";
 import { AttachmentSelector } from "@/components/chat/AttachmentSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNative } from "@/hooks/useNative";
+import { useUserPresence } from "@/hooks/useUserPresence";
+import { notificationService } from "@/services/NotificationService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +55,9 @@ const ChatConversationPage = () => {
   
   const recipientName = location.state?.username || "Usuário";
   const recipientAvatar = location.state?.avatar_url;
+
+  const { getUserStatus } = useUserPresence();
+  const recipientStatus = getUserStatus(userId || "");
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -147,6 +151,28 @@ const ChatConversationPage = () => {
     );
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'online':
+        return 'text-green-500';
+      case 'away':
+        return 'text-yellow-500';
+      default:
+        return 'text-gray-500';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'online':
+        return 'Online';
+      case 'away':
+        return 'Ausente';
+      default:
+        return 'Offline';
+    }
+  };
+
   if (!userId) {
     navigate('/chat');
     return null;
@@ -190,6 +216,11 @@ const ChatConversationPage = () => {
                 </AvatarFallback>
               )}
             </Avatar>
+            {/* Status indicator */}
+            <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${
+              recipientStatus === 'online' ? 'bg-green-500' :
+              recipientStatus === 'away' ? 'bg-yellow-500' : 'bg-gray-400'
+            }`} />
           </div>
           
           <div className="flex-1 min-w-0">
@@ -200,12 +231,14 @@ const ChatConversationPage = () => {
               {isOnline ? (
                 <>
                   <Wifi className="h-3 w-3 text-green-500" />
-                  <p className="text-xs text-green-500">Online</p>
+                  <p className={`text-xs ${getStatusColor(recipientStatus)}`}>
+                    {getStatusText(recipientStatus)}
+                  </p>
                 </>
               ) : (
                 <>
                   <WifiOff className="h-3 w-3 text-red-500" />
-                  <p className="text-xs text-red-500">Offline</p>
+                  <p className="text-xs text-red-500">Sem conexão</p>
                 </>
               )}
             </div>
