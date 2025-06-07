@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { Outlet } from "react-router-dom";
 import { MobileBottomNavigation } from "./MobileBottomNavigation";
+import { Footer } from "./Footer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNative } from "@/hooks/useNative";
 import { useEffect } from "react";
@@ -31,7 +32,7 @@ const AppLayout = () => {
     <SidebarProvider>
       <div className={`flex h-screen w-full ${isNative ? 'native-app' : ''}`}>
         {!isMobile && <AppSidebar />}
-        <SidebarInset className="flex-1">
+        <SidebarInset className="flex-1 flex flex-col">
           {/* Header with sidebar trigger for desktop and safe area for mobile */}
           {!isMobile && (
             <header className="flex h-12 items-center border-b px-4">
@@ -49,6 +50,9 @@ const AppLayout = () => {
               <Outlet />
             </div>
           </main>
+
+          {/* Footer - only on desktop */}
+          {!isMobile && <Footer />}
         </SidebarInset>
       </div>
       {isMobile && <MobileBottomNavigation />}
