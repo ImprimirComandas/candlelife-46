@@ -56,12 +56,12 @@ export const useRealtimeMessages = ({
         table: 'messages',
         filter: `or(sender_id.eq.${user.id},recipient_id.eq.${user.id})`
       },
-      (payload: RealtimeMessageEvent) => {
+      (payload: any) => {
         console.log('💬 Realtime message event:', payload);
         
         if (payload.eventType === 'INSERT' && payload.new) {
           console.log('📩 New message received:', payload.new);
-          onNewMessage?.(payload.new);
+          onNewMessage?.(payload.new as Message);
           
           // Invalidate queries
           queryClient.invalidateQueries({ queryKey: messageKeys.chatUsers() });
@@ -75,7 +75,7 @@ export const useRealtimeMessages = ({
           });
         } else if (payload.eventType === 'UPDATE' && payload.new) {
           console.log('📝 Message updated:', payload.new);
-          onMessageUpdate?.(payload.new);
+          onMessageUpdate?.(payload.new as Message);
           
           const otherUserId = payload.new.sender_id === user.id 
             ? payload.new.recipient_id 

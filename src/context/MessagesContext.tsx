@@ -21,6 +21,16 @@ interface MessagesContextType {
   useChatUsers: ReturnType<typeof useMessages>['useChatUsers'];
   useConversation: ReturnType<typeof useMessages>['useConversation'];
   showNotification: (message: Message) => Promise<void>;
+  
+  // Direct data access
+  chatUsers: ChatUser[];
+  isLoadingChatUsers: boolean;
+  getTotalUnreadCount: () => number;
+  
+  // Direct functions for compatibility
+  getConversation: ReturnType<typeof useMessages>['getConversation'];
+  deleteMessage: ReturnType<typeof useMessages>['deleteMessage'];
+  editMessage: ReturnType<typeof useMessages>['editMessage'];
 }
 
 const MessagesContext = createContext<MessagesContextType | undefined>(undefined);
@@ -36,7 +46,13 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     useSendMessage,
     useMarkConversationAsRead,
     useClearConversation,
-    showNotification
+    showNotification,
+    chatUsers,
+    isLoadingChatUsers,
+    getTotalUnreadCount,
+    getConversation,
+    deleteMessage,
+    editMessage
   } = useMessages();
 
   const sendMessage = useSendMessage();
@@ -116,7 +132,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   }, [sendMessage]);
 
-  const clearConversation = useCallback(async (userId: string) => {
+  const clearConversationAction = useCallback(async (userId: string) => {
     return new Promise<void>((resolve, reject) => {
       clearChat.mutate(userId, {
         onSuccess: () => resolve(),
@@ -133,10 +149,16 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setActiveConversation,
       markConversationAsRead,
       sendMessage: sendMessageAction,
-      clearConversation,
+      clearConversation: clearConversationAction,
       useChatUsers,
       useConversation,
-      showNotification
+      showNotification,
+      chatUsers,
+      isLoadingChatUsers,
+      getTotalUnreadCount,
+      getConversation,
+      deleteMessage,
+      editMessage
     }}>
       {children}
     </MessagesContext.Provider>

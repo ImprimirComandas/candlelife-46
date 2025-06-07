@@ -1,13 +1,10 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+console.log("Hello from get-chat-users!");
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -20,23 +17,82 @@ serve(async (req) => {
     )
 
     const { data: { user } } = await supabaseClient.auth.getUser()
-    if (!user) throw new Error('No user found')
+    
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
-    // Get chat users with unread message counts
-    const { data, error } = await supabaseClient.rpc('get_chat_users_with_unread', {
-      current_user_id: user.id
-    });
+    const { p_user_id } = await req.json()
 
-    if (error) throw error
+    // Get all messages involving the user
+    const { data: messages, error } = await supabaseClient
+      .from('messages')
+      .select(`
+        id,
+        sender_id,
+        recipient_id,
+        content,
+        created_at,
+        read,
+        sender_profile:profiles!messages_sender_id_fkey(username, avatar_url),
+        recipient_profile:profiles!messages_recipient_id_fkey(username, avatar_url)
+      `)
+      .or(`sender_id.eq.${p_user_id},recipient_id.eq.${p_user_id}`)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    // Group by conversation partner
+    const conversationMap = new Map()
+    
+    messages?.forEach((msg) => {
+      const isFromMe = msg.sender_id === p_user_id
+      const partnerId = isFromMe ? msg.recipient_id : msg.sender_id
+      const partnerProfile = isFromMe ? msg.recipient_profile : msg.sender_profile
+      
+      if (!conversationMap.has(partnerId)) {
+        conversationMap.set(partnerId, {
+          user_id: partnerId,
+          username: partnerProfile?.username || 'Usuário',
+          avatar_url: partnerProfile?.avatar_url,
+          last_message: {
+            id: msg.id,
+            content: msg.content,
+            sender_id: msg.sender_id,
+            recipient_id: msg.recipient_id,
+            created_at: msg.created_at,
+            read: msg.read,
+            message_status: 'sent'
+          },
+          unread_count: 0
+        })
+      }
+    })
+
+    const chatUsers = Array.from(conversationMap.values())
 
     return new Response(
-      JSON.stringify(data),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      JSON.stringify(chatUsers),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
+
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 },
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
   }
 })

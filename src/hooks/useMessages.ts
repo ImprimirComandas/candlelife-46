@@ -39,36 +39,58 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         console.log('🔍 Fetching chat users for:', user.id);
 
         try {
-          const { data, error } = await supabase.rpc('get_chat_users', {
-            p_user_id: user.id
-          });
+          const { data, error } = await supabase
+            .from('messages')
+            .select(`
+              id,
+              sender_id,
+              recipient_id,
+              content,
+              created_at,
+              read,
+              sender_profile:profiles!messages_sender_id_fkey(username, avatar_url),
+              recipient_profile:profiles!messages_recipient_id_fkey(username, avatar_url)
+            `)
+            .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+            .order('created_at', { ascending: false });
 
           if (error) {
             console.error('❌ Error fetching chat users:', error);
             throw error;
           }
 
-          const chatUsers: ChatUser[] = (data || []).map((item: any) => ({
-            id: item.user_id,
-            username: item.username || 'Usuário',
-            avatar_url: item.avatar_url,
-            last_message: item.last_message ? {
-              id: item.last_message.id,
-              content: item.last_message.content,
-              sender_id: item.last_message.sender_id,
-              recipient_id: item.last_message.recipient_id,
-              created_at: item.last_message.created_at,
-              read: item.last_message.read,
-              message_status: item.last_message.message_status || MessageStatus.SENT,
-              message_type: MessageType.TEXT,
-              deleted_by_recipient: item.last_message.deleted_by_recipient || false,
-              attachment_url: item.last_message.attachment_url,
-              sender_username: item.username,
-              sender_avatar_url: item.avatar_url
-            } : undefined,
-            unread_count: item.unread_count || 0
-          }));
+          // Group messages by conversation partner
+          const conversationMap = new Map<string, ChatUser>();
+          
+          data?.forEach((msg: any) => {
+            const isFromMe = msg.sender_id === user.id;
+            const partnerId = isFromMe ? msg.recipient_id : msg.sender_id;
+            const partnerProfile = isFromMe ? msg.recipient_profile : msg.sender_profile;
+            
+            if (!conversationMap.has(partnerId)) {
+              conversationMap.set(partnerId, {
+                id: partnerId,
+                username: partnerProfile?.username || 'Usuário',
+                avatar_url: partnerProfile?.avatar_url,
+                last_message: {
+                  id: msg.id,
+                  content: msg.content,
+                  sender_id: msg.sender_id,
+                  recipient_id: msg.recipient_id,
+                  created_at: msg.created_at,
+                  read: msg.read,
+                  message_status: MessageStatus.SENT,
+                  message_type: MessageType.TEXT,
+                  deleted_by_recipient: false,
+                  sender_username: partnerProfile?.username,
+                  sender_avatar_url: partnerProfile?.avatar_url
+                },
+                unread_count: 0
+              });
+            }
+          });
 
+          const chatUsers = Array.from(conversationMap.values());
           console.log('✅ Fetched chat users:', chatUsers.length);
           return chatUsers;
         } catch (error) {
@@ -102,12 +124,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
               created_at,
               read,
               message_status,
-              message_type,
-              edited_at,
               attachment_url,
-              file_name,
-              file_size,
-              duration,
               sender_profile:profiles!messages_sender_id_fkey(username, avatar_url)
             `)
             .or(`and(sender_id.eq.${user.id},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${user.id})`)
@@ -134,12 +151,8 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
             created_at: msg.created_at,
             read: msg.read,
             message_status: msg.message_status || MessageStatus.SENT,
-            message_type: msg.message_type || MessageType.TEXT,
-            edited_at: msg.edited_at,
+            message_type: MessageType.TEXT,
             attachment_url: msg.attachment_url,
-            file_name: msg.file_name,
-            file_size: msg.file_size,
-            duration: msg.duration,
             deleted_by_recipient: false,
             sender_username: msg.sender_profile?.username,
             sender_avatar_url: msg.sender_profile?.avatar_url,
@@ -188,11 +201,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
           sender_id: user.id,
           recipient_id: recipientId,
           content,
-          message_type: messageType,
-          attachment_url: attachmentUrl,
-          file_name: fileName,
-          file_size: fileSize,
-          duration: duration
+          attachment_url: attachmentUrl
         })
         .select()
         .single();
@@ -273,6 +282,60 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     }
   });
 
+  // Delete message
+  const useDeleteMessage = () => useMutation({
+    mutationFn: async (messageId: string) => {
+      if (!user) throw new Error('User not authenticated');
+
+      console.log('🗑️ Deleting message:', messageId);
+
+      const { error } = await supabase.rpc('soft_delete_message', {
+        p_message_id: messageId,
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('❌ Error deleting message:', error);
+        throw error;
+      }
+
+      console.log('✅ Message deleted');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: messageKeys.chatUsers() });
+      if (activeConversation) {
+        queryClient.invalidateQueries({ queryKey: messageKeys.conversation(activeConversation) });
+      }
+    }
+  });
+
+  // Edit message
+  const useEditMessage = () => useMutation({
+    mutationFn: async ({ messageId, content }: { messageId: string; content: string }) => {
+      if (!user) throw new Error('User not authenticated');
+
+      console.log('✏️ Editing message:', messageId);
+
+      const { error } = await supabase.rpc('edit_message', {
+        p_message_id: messageId,
+        p_user_id: user.id,
+        p_new_content: content
+      });
+
+      if (error) {
+        console.error('❌ Error editing message:', error);
+        throw error;
+      }
+
+      console.log('✅ Message edited');
+    },
+    onSuccess: () => {
+      if (activeConversation) {
+        queryClient.invalidateQueries({ queryKey: messageKeys.conversation(activeConversation) });
+      }
+    }
+  });
+
   // Get conversation settings
   const useConversationSettings = (otherUserId: string) => {
     return useQuery({
@@ -318,6 +381,18 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     }
   }, []);
 
+  // Get total unread count
+  const getTotalUnreadCount = () => {
+    const chatUsersQuery = useChatUsers();
+    const chatUsers = chatUsersQuery.data || [];
+    return chatUsers.reduce((total, user) => total + user.unread_count, 0);
+  };
+
+  // Direct access to data for components that need it
+  const chatUsersQuery = useChatUsers();
+  const chatUsers = chatUsersQuery.data || [];
+  const isLoadingChatUsers = chatUsersQuery.isLoading;
+
   return {
     // State
     activeConversation,
@@ -331,6 +406,20 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     useMarkConversationAsRead,
     useClearConversation,
     useConversationSettings,
+    useDeleteMessage,
+    useEditMessage,
+
+    // Direct data access
+    chatUsers,
+    isLoadingChatUsers,
+    getTotalUnreadCount,
+
+    // Direct functions for compatibility
+    getConversation: useConversation,
+    sendMessage: useSendMessage(),
+    clearConversation: useClearConversation(),
+    deleteMessage: useDeleteMessage(),
+    editMessage: useEditMessage(),
 
     // Functions
     showNotification
