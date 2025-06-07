@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,7 +28,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<any>(null);
 
-  // Get chat users with simplified query
+  // Get chat users with better error handling
   const useChatUsers = () => {
     return useQuery({
       queryKey: messageKeys.chatUsers(),
@@ -39,64 +38,78 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         console.log('🔍 Fetching chat users for:', user.id);
 
         try {
-          // Simple query without complex joins
-          const { data, error } = await supabase
+          // Get messages to find conversations
+          const { data: messages, error: messagesError } = await supabase
             .from('messages')
             .select('sender_id, recipient_id, content, created_at')
             .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
             .order('created_at', { ascending: false });
 
-          if (error) {
-            console.error('❌ Error fetching messages:', error);
-            throw error;
+          if (messagesError) {
+            console.error('❌ Error fetching messages:', messagesError);
+            throw messagesError;
           }
 
           // Get unique user IDs
           const userIds = new Set<string>();
-          data?.forEach((msg: any) => {
+          messages?.forEach((msg: any) => {
             if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
             if (msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
           });
 
           if (userIds.size === 0) return [];
 
-          // Get user profiles separately
+          // Get user profiles
           const { data: profiles, error: profileError } = await supabase
             .from('profiles')
             .select('id, username, avatar_url, created_at, updated_at')
             .in('id', Array.from(userIds));
 
           if (profileError) {
-            console.error('❌ Error fetching profiles:', error);
+            console.error('❌ Error fetching profiles:', profileError);
             throw profileError;
           }
 
-          // Map to ChatUser format
-          const chatUsers: ChatUser[] = (profiles || []).map((profile: any) => ({
-            id: profile.id,
-            username: profile.username || 'Usuário',
-            full_name: profile.username || undefined,
-            avatar_url: profile.avatar_url || undefined,
-            email: profile.username || undefined,
-            created_at: profile.created_at || new Date().toISOString(),
-            updated_at: profile.updated_at || new Date().toISOString(),
-            unread_count: 0
-          }));
+          // Map to ChatUser format with unread count
+          const chatUsers: ChatUser[] = [];
+          
+          for (const profile of profiles || []) {
+            // Count unread messages from this user
+            const { count } = await supabase
+              .from('messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('recipient_id', user.id)
+              .eq('sender_id', profile.id)
+              .eq('read', false);
+
+            chatUsers.push({
+              id: profile.id,
+              username: profile.username || 'Usuário',
+              full_name: profile.username || undefined,
+              avatar_url: profile.avatar_url || undefined,
+              email: profile.username || undefined,
+              created_at: profile.created_at || new Date().toISOString(),
+              updated_at: profile.updated_at || new Date().toISOString(),
+              unread_count: count || 0
+            });
+          }
 
           console.log('✅ Fetched chat users:', chatUsers.length);
           return chatUsers;
         } catch (error) {
           console.error('❌ Error in chat users query:', error);
-          throw error;
+          return [];
         }
       },
       enabled: !!user,
       staleTime: 30000,
       refetchOnWindowFocus: false,
+      retry: 2,
+      retryDelay: 1000,
     });
   };
 
-  // Get conversation messages with simplified query
+  // Get conversation messages with better error handling
   const useConversation = (otherUserId: string, searchTerm?: string) => {
     return useQuery({
       queryKey: messageKeys.conversationWithSearch(otherUserId, searchTerm),
@@ -142,16 +155,18 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
           return messages;
         } catch (error) {
           console.error('❌ Error in conversation query:', error);
-          throw error;
+          return [];
         }
       },
       enabled: !!user && !!otherUserId,
       staleTime: 0,
       refetchOnWindowFocus: false,
+      retry: 2,
+      retryDelay: 1000,
     });
   };
 
-  // Send message with simplified mutation
+  // Send message with better error handling
   const useSendMessage = () => useMutation({
     mutationFn: async ({ 
       recipientId, 
@@ -167,6 +182,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
       fileSize?: number;
     }) => {
       if (!user) throw new Error('User not authenticated');
+      if (!content.trim() && !attachmentUrl) throw new Error('Content or attachment required');
 
       console.log('📤 Sending message:', { recipientId, content: content.substring(0, 50) + '...' });
 
@@ -175,7 +191,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         .insert({
           sender_id: user.id,
           recipient_id: recipientId,
-          content,
+          content: content.trim(),
           attachment_url: attachmentUrl
         })
         .select()
@@ -195,6 +211,10 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
       if (activeConversation) {
         queryClient.invalidateQueries({ queryKey: messageKeys.conversation(activeConversation) });
       }
+      toast({
+        title: "Mensagem enviada",
+        description: "Sua mensagem foi enviada com sucesso.",
+      });
     },
     onError: (error) => {
       console.error('❌ Send message error:', error);
@@ -321,7 +341,6 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
       queryFn: async (): Promise<ConversationSettings | null> => {
         if (!user || !otherUserId) return null;
 
-        // Return default settings for now
         return {
           notifications_enabled: true,
           archived: false,

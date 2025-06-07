@@ -43,11 +43,16 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
             .eq('id', user.id)
             .single();
           
-          if (error) throw error;
+          if (error) {
+            console.error("Error loading user theme:", error);
+            return;
+          }
           
           if (data && data.active_theme) {
-            setThemeState(data.active_theme as Theme);
-            localStorage.setItem("theme", data.active_theme);
+            const userTheme = data.active_theme as Theme;
+            setThemeState(userTheme);
+            localStorage.setItem("theme", userTheme);
+            console.log("Loaded user theme:", userTheme);
           }
         } catch (error) {
           console.error("Error loading user theme:", error);
@@ -58,16 +63,42 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     loadUserTheme();
   }, [user]);
 
+  // Apply theme to document with proper CSS custom properties
+  const applyThemeToDocument = useCallback((themeName: Theme) => {
+    // Remove all existing theme attributes and classes
+    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.classList.remove(
+      "light", "dark", "cyberpunk", "dracula", "nord", "purple", 
+      "green", "ocean", "sunset", "forest", "coffee", "pastel", 
+      "neon", "vintage", "midnight", "royal", "super-hacker"
+    );
+    
+    // Set the new theme
+    document.documentElement.setAttribute("data-theme", themeName);
+    document.documentElement.classList.add(themeName);
+    
+    // Special handling for dark mode compatibility
+    if (themeName === "dark" || themeName === "dracula" || themeName === "midnight" || themeName === "super-hacker") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    
+    console.log("Applied theme:", themeName);
+  }, []);
+
   // Update both localStorage and state
   const setTheme = useCallback(async (newTheme: Theme) => {
     setIsUpdating(true);
     
     try {
+      console.log("Setting theme to:", newTheme);
+      
       setThemeState(newTheme);
       localStorage.setItem("theme", newTheme);
       
       // Apply theme immediately to document
-      document.documentElement.setAttribute("data-theme", newTheme);
+      applyThemeToDocument(newTheme);
       
       // If user is authenticated, save their preference to their profile
       if (user) {
@@ -76,26 +107,24 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
           .update({ active_theme: newTheme })
           .eq('id', user.id);
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error saving theme preference:", error);
+        } else {
+          console.log("Theme preference saved to database");
+        }
       }
     } catch (error) {
       console.error("Error saving theme preference:", error);
+      throw error;
     } finally {
       setIsUpdating(false);
     }
-  }, [user]);
+  }, [user, applyThemeToDocument]);
 
-  // Apply theme to document
+  // Apply theme on component mount and theme changes
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    
-    // Also apply to document.body for better compatibility
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [theme]);
+    applyThemeToDocument(theme);
+  }, [theme, applyThemeToDocument]);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, isUpdating }}>
