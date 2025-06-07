@@ -77,7 +77,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const senderInfo = chatUsers.find(u => u.id === message.sender_id) || {
         id: message.sender_id,
         username: 'Usuário',
-        avatar_url: null,
+        avatar_url: undefined,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         unread_count: 0
