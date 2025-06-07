@@ -51,81 +51,61 @@ function App() {
                   {/* Protected Routes */}
                   <Route path="/dashboard" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <Dashboard />
-                      </AppLayout>
+                      <AppLayout><Dashboard /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/transactions" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <Transactions />
-                      </AppLayout>
+                      <AppLayout><Transactions /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/expenses" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <Expenses />
-                      </AppLayout>
+                      <AppLayout><Expenses /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/goals" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <Goals />
-                      </AppLayout>
+                      <AppLayout><Goals /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/settings" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <Settings />
-                      </AppLayout>
+                      <AppLayout><Settings /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/social" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <Social />
-                      </AppLayout>
+                      <AppLayout><Social /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/chat" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <ChatPage />
-                      </AppLayout>
+                      <AppLayout><ChatPage /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/chat/:userId" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <ChatConversation />
-                      </AppLayout>
+                      <AppLayout><ChatConversation /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/clients" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <Clients />
-                      </AppLayout>
+                      <AppLayout><Clients /></AppLayout>
                     </ProtectedRoute>
                   } />
                   
                   <Route path="/invoiced" element={
                     <ProtectedRoute>
-                      <AppLayout>
-                        <InvoicedTransactions />
-                      </AppLayout>
+                      <AppLayout><InvoicedTransactions /></AppLayout>
                     </ProtectedRoute>
                   } />
                   

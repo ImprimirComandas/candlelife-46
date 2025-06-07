@@ -1,4 +1,5 @@
-import { Message } from "@/hooks/messages/types";
+
+import { Message } from "@/types/messages";
 import { MessageItem } from "./MessageItem";
 import { ReactNode } from "react";
 
