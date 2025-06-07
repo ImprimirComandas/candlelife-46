@@ -12,7 +12,6 @@ import { useSimpleChat } from "@/hooks/useSimpleChat";
 const ChatPage = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedUser, setSelectedUser] = useState<any>(null);
   
   const { 
     chatUsers, 
@@ -74,24 +73,25 @@ const ChatPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-md mx-auto">
+    <div className="flex flex-col h-full w-full max-w-full mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50 p-4">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50 p-4 flex-shrink-0">
         <div className="flex items-center gap-3 mb-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/dashboard')}
+            className="flex-shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold">Conversas</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-semibold truncate">Conversas</h1>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span>Online</span>
+              <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+              <span className="truncate">Online</span>
               {totalUnread > 0 && (
-                <span>• {totalUnread} mensagens não lidas</span>
+                <span className="flex-shrink-0">• {totalUnread} mensagens não lidas</span>
               )}
             </div>
           </div>
@@ -104,15 +104,15 @@ const ChatPage = () => {
             placeholder="Buscar conversas..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 rounded-xl"
+            className="pl-10 rounded-xl w-full"
           />
         </div>
       </div>
 
       {/* Chat List */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto min-h-0">
         {filteredUsers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center">
+          <div className="flex flex-col items-center justify-center p-8 text-center h-full">
             <MessageCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="font-medium mb-2">
               {searchQuery ? "Nenhuma conversa encontrada" : "Nenhuma conversa ainda"}
@@ -132,7 +132,7 @@ const ChatPage = () => {
                 onClick={() => handleUserSelect(user)}
                 className="w-full p-4 flex items-center gap-3 hover:bg-accent/50 transition-colors text-left"
               >
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   <Avatar className="h-12 w-12">
                     {user.avatar_url ? (
                       <AvatarImage src={user.avatar_url} alt={user.username} />

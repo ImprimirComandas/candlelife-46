@@ -20,7 +20,6 @@ const AppLayout = () => {
         hapticFeedback('light');
       };
 
-      // Adicionar feedback háptico sutil para botões
       document.addEventListener('touchstart', handleTouchStart, { passive: true });
 
       return () => {
@@ -33,21 +32,21 @@ const AppLayout = () => {
     <SidebarProvider>
       <div className={`flex h-screen w-full ${isNative ? 'native-app' : ''}`}>
         {!isMobile && <AppSidebar />}
-        <SidebarInset className="flex-1 flex flex-col">
+        <SidebarInset className="flex-1 flex flex-col min-w-0">
           {/* Header with sidebar trigger for desktop and safe area for mobile */}
           {!isMobile && (
-            <header className="flex h-12 items-center border-b px-4">
+            <header className="flex h-12 items-center border-b px-4 flex-shrink-0">
               <SidebarTrigger />
             </header>
           )}
           
           {/* Main content with proper safe areas and mobile spacing */}
-          <main className={`flex-1 overflow-auto ${
+          <main className={`flex-1 overflow-auto min-h-0 ${
             isMobile 
-              ? 'mobile-content pb-24 pt-2' 
-              : 'p-4 pt-0'
+              ? 'mobile-content pb-20 pt-2' 
+              : 'p-0'
           } ${isNative ? 'safe-area-top' : ''}`}>
-            <div className={!isMobile ? 'p-4' : 'p-4 pt-6'}>
+            <div className={`h-full ${!isMobile ? 'p-4' : 'p-2 pt-4'}`}>
               <Outlet />
             </div>
           </main>

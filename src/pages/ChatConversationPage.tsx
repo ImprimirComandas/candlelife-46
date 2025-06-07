@@ -132,7 +132,7 @@ const ChatConversationPage = () => {
 
   if (conversationQuery.isLoading && messages.length === 0) {
     return (
-      <div className="flex flex-col h-screen max-w-md mx-auto items-center justify-center p-6">
+      <div className="flex flex-col h-full w-full items-center justify-center p-6">
         <Spinner className="w-8 h-8 mb-4" />
         <p className="text-muted-foreground">Carregando conversa...</p>
       </div>
@@ -142,19 +142,20 @@ const ChatConversationPage = () => {
   const groupedMessages = groupMessagesByDate();
 
   return (
-    <div className="flex flex-col h-screen max-w-md mx-auto">
+    <div className="flex flex-col h-full w-full max-w-full mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50 p-4">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50 p-4 flex-shrink-0">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/chat')}
+            className="flex-shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <Avatar className="h-10 w-10">
               {recipientAvatar ? (
                 <AvatarImage src={recipientAvatar} alt={recipientName} />
@@ -166,8 +167,8 @@ const ChatConversationPage = () => {
             </Avatar>
           </div>
           
-          <div className="flex-1">
-            <h2 className="font-medium text-lg">
+          <div className="flex-1 min-w-0">
+            <h2 className="font-medium text-lg truncate">
               {recipientName}
             </h2>
             <p className="text-xs text-green-500">
@@ -177,7 +178,7 @@ const ChatConversationPage = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="flex-shrink-0">
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -197,7 +198,7 @@ const ChatConversationPage = () => {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+      <ScrollArea className="flex-1 p-4 min-h-0" ref={scrollAreaRef}>
         <div className="space-y-4">
           {groupedMessages.length === 0 ? (
             <div className="text-center py-8">
@@ -229,7 +230,7 @@ const ChatConversationPage = () => {
                       }`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                        className={`max-w-[80%] sm:max-w-[70%] rounded-2xl px-4 py-2 break-words ${
                           isMe
                             ? 'bg-primary text-primary-foreground rounded-br-md'
                             : 'bg-muted rounded-bl-md'
@@ -267,20 +268,20 @@ const ChatConversationPage = () => {
       </ScrollArea>
 
       {/* Message Input */}
-      <div className="sticky bottom-0 bg-background/95 backdrop-blur-md border-t border-border/50 p-4">
-        <div className="flex items-center gap-3">
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur-md border-t border-border/50 p-4 flex-shrink-0">
+        <div className="flex items-center gap-3 w-full">
           <Input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Digite sua mensagem..."
-            className="flex-1 rounded-full"
+            className="flex-1 rounded-full min-w-0"
           />
           <Button
             size="icon"
             onClick={handleSendMessage}
             disabled={!message.trim() || sendMessageMutation.isPending}
-            className="rounded-full"
+            className="rounded-full flex-shrink-0"
           >
             {sendMessageMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -88,6 +88,37 @@
   @apply min-h-full;
 }
 
+/* Responsive design improvements */
+@media (max-width: 640px) {
+  .mobile-content {
+    @apply pb-16;
+  }
+  
+  /* Ensure full width usage on mobile */
+  .max-w-md {
+    @apply max-w-full;
+  }
+  
+  /* Better text wrapping on small screens */
+  .break-words {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+}
+
+/* Better responsive containers */
+@media (max-width: 768px) {
+  .container {
+    @apply px-2;
+  }
+  
+  /* Improve small screen layouts */
+  .grid-responsive {
+    @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
 /* Native transitions for better mobile experience */
 .native-transition {
   transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
@@ -246,4 +277,38 @@
   .native-transition {
     transition: none;
   }
+}
+
+/* Improved touch targets for mobile */
+@media (max-width: 768px) {
+  button, 
+  [role="button"], 
+  input[type="button"], 
+  input[type="submit"] {
+    @apply min-h-[44px];
+  }
+  
+  /* Better spacing on mobile */
+  .p-4 {
+    @apply p-3;
+  }
+  
+  .px-4 {
+    @apply px-3;
+  }
+  
+  .py-4 {
+    @apply py-3;
+  }
+}
+
+/* Full height utilities */
+.h-full-screen {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile browsers */
+}
+
+/* Better flex layouts for small screens */
+.flex-responsive {
+  @apply flex flex-col sm:flex-row;
 }
