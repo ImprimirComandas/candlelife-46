@@ -17,7 +17,7 @@ interface CreatePostFormProps {
 export const CreatePostForm = ({ isOpen, onOpenChange }: CreatePostFormProps) => {
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const { addPost } = usePosts();
+  const { createPost } = usePosts();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +33,7 @@ export const CreatePostForm = ({ isOpen, onOpenChange }: CreatePostFormProps) =>
     }
 
     try {
-      await addPost.mutateAsync({
+      await createPost.mutateAsync({
         content: content.trim(),
         imageFile
       });
@@ -111,9 +111,9 @@ export const CreatePostForm = ({ isOpen, onOpenChange }: CreatePostFormProps) =>
             </Button>
             <Button 
               type="submit" 
-              disabled={addPost.isPending || !content.trim()}
+              disabled={createPost.isPending || !content.trim()}
             >
-              {addPost.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {createPost.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Publicar
             </Button>
           </div>
