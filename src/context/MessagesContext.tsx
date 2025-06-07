@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useMessages } from '@/hooks/useMessages';
@@ -40,6 +41,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activeConversation, setActiveConversationState] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const messagesHook = useMessages();
   const {
     useChatUsers,
     useConversation,
@@ -52,7 +54,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     chatUsers,
     isLoadingChatUsers,
     getTotalUnreadCount
-  } = useMessages();
+  } = messagesHook;
 
   // Inicializar sistema de notificações
   const {
@@ -61,11 +63,11 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     isInitialized: notificationSystemReady
   } = useNotificationSystem();
 
-  const sendMessage = useSendMessage();
-  const markAsRead = useMarkConversationAsRead();
-  const clearChat = useClearConversation();
-  const deleteMsg = useDeleteMessage();
-  const editMsg = useEditMessage();
+  const sendMessageMutation = useSendMessage();
+  const markAsReadMutation = useMarkConversationAsRead();
+  const clearChatMutation = useClearConversation();
+  const deleteMsgMutation = useDeleteMessage();
+  const editMsgMutation = useEditMessage();
 
   // Handle new messages from realtime with enhanced notifications
   const handleNewMessage = useCallback(async (message: Message) => {
@@ -77,7 +79,9 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const senderInfo = chatUsers.find(u => u.id === message.sender_id) || {
         id: message.sender_id,
         username: 'Usuário',
+        full_name: 'Usuário',
         avatar_url: undefined,
+        email: undefined,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         unread_count: 0
@@ -98,10 +102,6 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUnreadCount(prev => prev + 1);
   }, [user?.id, activeConversation, chatUsers, processNotification, notificationSystemReady, showNotification]);
 
-  const handleMessageUpdate = useCallback((message: Message) => {
-    console.log('📝 Message updated in context:', message);
-  }, []);
-
   // Setup realtime
   const { isConnected } = useRealtimeMessages({
     activeConversation: activeConversation || undefined,
@@ -114,7 +114,6 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Auto-request permissions when user logs in
   useEffect(() => {
     if (user && notificationSystemReady) {
-      // Request permissions with a slight delay to avoid overwhelming the user
       setTimeout(() => {
         requestPermissions();
       }, 2000);
@@ -128,18 +127,18 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Mark as read when opening conversation
     if (userId) {
       setTimeout(() => {
-        markAsRead.mutate(userId, {
+        markAsReadMutation.mutate(userId, {
           onSuccess: () => {
             setUnreadCount(prev => Math.max(0, prev - 1));
           }
         });
       }, 1000);
     }
-  }, [markAsRead]);
+  }, [markAsReadMutation]);
 
   const markConversationAsRead = useCallback(async (userId: string) => {
     return new Promise<void>((resolve, reject) => {
-      markAsRead.mutate(userId, {
+      markAsReadMutation.mutate(userId, {
         onSuccess: () => {
           setUnreadCount(prev => Math.max(0, prev - 1));
           resolve();
@@ -147,53 +146,61 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         onError: reject
       });
     });
-  }, [markAsRead]);
+  }, [markAsReadMutation]);
 
-  const sendMessageAction = useCallback(async (
+  const sendMessage = useCallback(async (
     recipientId: string, 
     content: string, 
     attachment?: File
   ) => {
+    console.log('📤 Sending message from context:', { recipientId, content: content.substring(0, 50) });
+    
     return new Promise<void>((resolve, reject) => {
-      sendMessage.mutate({
+      sendMessageMutation.mutate({
         recipientId,
         content,
         attachmentUrl: attachment ? URL.createObjectURL(attachment) : undefined,
         fileName: attachment?.name,
         fileSize: attachment?.size
       }, {
-        onSuccess: () => resolve(),
-        onError: reject
+        onSuccess: () => {
+          console.log('✅ Message sent successfully from context');
+          resolve();
+        },
+        onError: (error) => {
+          console.error('❌ Error sending message from context:', error);
+          reject(error);
+        }
       });
     });
-  }, [sendMessage]);
+  }, [sendMessageMutation]);
 
-  const clearConversationAction = useCallback(async (userId: string) => {
+  const clearConversation = useCallback(async (userId: string) => {
     return new Promise<void>((resolve, reject) => {
-      clearChat.mutate(userId, {
+      clearChatMutation.mutate(userId, {
         onSuccess: () => resolve(),
         onError: reject
       });
     });
-  }, [clearChat]);
+  }, [clearChatMutation]);
 
-  const deleteMessageAction = useCallback(async (messageId: string) => {
+  const deleteMessage = useCallback(async (messageId: string) => {
     return new Promise<void>((resolve, reject) => {
-      deleteMsg.mutate(messageId, {
+      deleteMsgMutation.mutate(messageId, {
         onSuccess: () => resolve(),
         onError: reject
       });
     });
-  }, [deleteMsg]);
+  }, [deleteMsgMutation]);
 
-  const editMessageAction = useCallback(async (messageId: string, content: string) => {
+  const editMessage = useCallback(async (messageId: string, content: string) => {
     return new Promise<void>((resolve, reject) => {
-      editMsg.mutate({ messageId, content }, {
+      editMsgMutation.mutate({ messageId, content }, {
         onSuccess: () => resolve(),
         onError: reject
       });
     });
-  }, [editMsg]);
+  }, [editMsgMutation]);
 
   return (
     <MessagesContext.Provider value={{
@@ -202,10 +209,10 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       unreadCount,
       setActiveConversation,
       markConversationAsRead,
-      sendMessage: sendMessageAction,
-      clearConversation: clearConversationAction,
-      deleteMessage: deleteMessageAction,
-      editMessage: editMessageAction,
+      sendMessage,
+      clearConversation,
+      deleteMessage,
+      editMessage,
       requestNotificationPermissions: requestPermissions,
       useChatUsers,
       useConversation,

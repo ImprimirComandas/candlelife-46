@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +29,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<any>(null);
 
-  // Get chat users with better error handling
+  // Get chat users with better error handling and last message
   const useChatUsers = () => {
     return useQuery({
       queryKey: messageKeys.chatUsers(),
@@ -38,21 +39,21 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         console.log('🔍 Fetching chat users for:', user.id);
 
         try {
-          // Get messages to find conversations
-          const { data: messages, error: messagesError } = await supabase
+          // Get unique conversation partners
+          const { data: conversations, error: conversationsError } = await supabase
             .from('messages')
             .select('sender_id, recipient_id, content, created_at')
             .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
             .order('created_at', { ascending: false });
 
-          if (messagesError) {
-            console.error('❌ Error fetching messages:', messagesError);
-            throw messagesError;
+          if (conversationsError) {
+            console.error('❌ Error fetching conversations:', conversationsError);
+            throw conversationsError;
           }
 
           // Get unique user IDs
           const userIds = new Set<string>();
-          messages?.forEach((msg: any) => {
+          conversations?.forEach((msg: any) => {
             if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
             if (msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
           });
@@ -70,7 +71,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
             throw profileError;
           }
 
-          // Map to ChatUser format with unread count
+          // Map to ChatUser format with unread count and last message
           const chatUsers: ChatUser[] = [];
           
           for (const profile of profiles || []) {
@@ -82,6 +83,28 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
               .eq('sender_id', profile.id)
               .eq('read', false);
 
+            // Get last message in conversation
+            const { data: lastMessageData } = await supabase
+              .from('messages')
+              .select('*')
+              .or(`and(sender_id.eq.${user.id},recipient_id.eq.${profile.id}),and(sender_id.eq.${profile.id},recipient_id.eq.${user.id})`)
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            const lastMessage = lastMessageData?.[0] ? {
+              id: lastMessageData[0].id,
+              content: lastMessageData[0].content,
+              sender_id: lastMessageData[0].sender_id,
+              recipient_id: lastMessageData[0].recipient_id,
+              created_at: lastMessageData[0].created_at,
+              read: lastMessageData[0].read || false,
+              message_status: MessageStatus.SENT,
+              message_type: MessageType.TEXT,
+              attachment_url: lastMessageData[0].attachment_url,
+              deleted_by_recipient: false,
+              reactions: []
+            } as Message : undefined;
+
             chatUsers.push({
               id: profile.id,
               username: profile.username || 'Usuário',
@@ -90,11 +113,19 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
               email: profile.username || undefined,
               created_at: profile.created_at || new Date().toISOString(),
               updated_at: profile.updated_at || new Date().toISOString(),
-              unread_count: count || 0
+              unread_count: count || 0,
+              last_message: lastMessage
             });
           }
 
-          console.log('✅ Fetched chat users:', chatUsers.length);
+          // Sort by last message date
+          chatUsers.sort((a, b) => {
+            const aDate = a.last_message?.created_at || a.created_at;
+            const bDate = b.last_message?.created_at || b.created_at;
+            return new Date(bDate).getTime() - new Date(aDate).getTime();
+          });
+
+          console.log('✅ Fetched chat users with last messages:', chatUsers.length);
           return chatUsers;
         } catch (error) {
           console.error('❌ Error in chat users query:', error);
@@ -102,8 +133,8 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         }
       },
       enabled: !!user,
-      staleTime: 30000,
-      refetchOnWindowFocus: false,
+      staleTime: 5000, // Reduced for more frequent updates
+      refetchOnWindowFocus: true,
       retry: 2,
       retryDelay: 1000,
     });
@@ -205,12 +236,11 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
       console.log('✅ Message sent successfully:', data.id);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       console.log('📤 Message sent, invalidating queries');
       queryClient.invalidateQueries({ queryKey: messageKeys.chatUsers() });
-      if (activeConversation) {
-        queryClient.invalidateQueries({ queryKey: messageKeys.conversation(activeConversation) });
-      }
+      queryClient.invalidateQueries({ queryKey: messageKeys.conversation(variables.recipientId) });
+      
       toast({
         title: "Mensagem enviada",
         description: "Sua mensagem foi enviada com sucesso.",
@@ -334,26 +364,6 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     }
   });
 
-  // Get conversation settings
-  const useConversationSettings = (otherUserId: string) => {
-    return useQuery({
-      queryKey: messageKeys.conversationSettings(otherUserId),
-      queryFn: async (): Promise<ConversationSettings | null> => {
-        if (!user || !otherUserId) return null;
-
-        return {
-          notifications_enabled: true,
-          archived: false,
-          pinned: false,
-          muted: false,
-          nickname: "",
-          background_image: ""
-        };
-      },
-      enabled: !!user && !!otherUserId,
-    });
-  };
-
   // Show notification
   const showNotification = useCallback(async (message: Message) => {
     if (!('Notification' in window)) return;
@@ -402,7 +412,6 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     useSendMessage,
     useMarkConversationAsRead,
     useClearConversation,
-    useConversationSettings,
     useDeleteMessage,
     useEditMessage,
 
@@ -410,13 +419,6 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     chatUsers,
     isLoadingChatUsers,
     getTotalUnreadCount,
-
-    // Direct functions for compatibility
-    getConversation: useConversation,
-    sendMessage: useSendMessage(),
-    clearConversation: useClearConversation(),
-    deleteMessage: useDeleteMessage(),
-    editMessage: useEditMessage(),
 
     // Functions
     showNotification
