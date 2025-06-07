@@ -25,6 +25,20 @@ export interface EnhancedMessage {
   sender_avatar_url?: string;
 }
 
+export interface ConversationSettings {
+  id?: string;
+  user_id?: string;
+  other_user_id?: string;
+  notifications_enabled: boolean;
+  archived: boolean;
+  pinned: boolean;
+  muted: boolean;
+  nickname: string;
+  background_image: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export const useEnhancedMessages = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -127,7 +141,7 @@ export const useEnhancedMessages = () => {
               file_size: undefined,
               duration: undefined,
               sender_username: senderProfile?.username,
-              sender_avatar_url: senderProfile?.avatar_url
+              sender_avatar_url: senderProfile?.avatar_url || undefined
             };
           }).reverse();
 
@@ -225,6 +239,77 @@ export const useEnhancedMessages = () => {
     }
   });
 
+  // Toggle reaction on message
+  const useToggleReaction = () => useMutation({
+    mutationFn: async ({ messageId, reaction }: { messageId: string; reaction: string }) => {
+      if (!user) throw new Error('User not authenticated');
+
+      console.log('🔄 Toggling reaction:', { messageId, reaction });
+
+      // For now, just return success - reactions table would need to be implemented
+      return { success: true };
+    },
+    onSuccess: () => {
+      console.log('✅ Reaction toggled');
+    },
+    onError: (error) => {
+      console.error('❌ Toggle reaction error:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar reação.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Get conversation settings
+  const useConversationSettings = (otherUserId: string) => {
+    return useQuery({
+      queryKey: ['conversation-settings', otherUserId],
+      queryFn: async (): Promise<ConversationSettings | null> => {
+        if (!user || !otherUserId) return null;
+
+        // For now, return default settings - conversation_settings table would need to be implemented
+        return {
+          notifications_enabled: true,
+          archived: false,
+          pinned: false,
+          muted: false,
+          nickname: "",
+          background_image: ""
+        };
+      },
+      enabled: !!user && !!otherUserId,
+    });
+  };
+
+  // Update conversation settings
+  const useUpdateConversationSettings = () => useMutation({
+    mutationFn: async ({ otherUserId, settings }: { 
+      otherUserId: string; 
+      settings: Partial<ConversationSettings> 
+    }) => {
+      if (!user) throw new Error('User not authenticated');
+
+      console.log('⚙️ Updating conversation settings:', { otherUserId, settings });
+
+      // For now, just return success - conversation_settings table would need to be implemented
+      return { success: true };
+    },
+    onSuccess: () => {
+      console.log('✅ Conversation settings updated');
+      queryClient.invalidateQueries({ queryKey: ['conversation-settings'] });
+    },
+    onError: (error) => {
+      console.error('❌ Update settings error:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar as configurações.",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Show notification function
   const showNotification = useCallback(async (message: any) => {
     if (!('Notification' in window)) return;
@@ -287,6 +372,9 @@ export const useEnhancedMessages = () => {
     useSendMessage,
     useMarkConversationAsRead,
     useClearConversation,
+    useToggleReaction,
+    useConversationSettings,
+    useUpdateConversationSettings,
 
     // Functions
     showNotification
