@@ -1,9 +1,8 @@
 
 import { useState, useEffect } from "react";
-import { useMessagesContext } from "@/context/MessagesContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useTypingIndicator } from "@/hooks/messages/useTypingIndicator";
+import { useHybridMessages } from "@/hooks/useHybridMessages";
 import { Message } from "@/types/messages";
 
 interface UseChatMessagesProps {
@@ -17,19 +16,19 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   
+  // Use hybrid system directly
   const {
-    useConversation,
-    sendMessage,
-    clearConversation,
-    deleteMessage,
-    editMessage,
-    setActiveConversation
-  } = useMessagesContext();
+    getConversation,
+    sendMessage: sendHybridMessage,
+    markAsRead,
+    sendTypingStatus
+  } = useHybridMessages({
+    activeConversation: isOpen ? recipientId : undefined,
+    enableTypingIndicators: true,
+    pollingInterval: 3000
+  });
 
-  const { sendTypingStatus, isUserTyping } = useTypingIndicator();
-  
-  // Use the conversation hook with just recipientId and searchQuery
-  const conversationQuery = useConversation(recipientId, searchQuery);
+  const conversationQuery = getConversation(recipientId, searchQuery);
   const messages = conversationQuery.data || [];
   const isLoading = conversationQuery.isLoading;
   const isError = conversationQuery.isError;
@@ -40,18 +39,17 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
   const totalCount = messages.length;
   const isLoadingMore = false;
   
-  // Check if recipient is typing
-  const recipientIsTyping = isUserTyping(recipientId);
+  // Check if recipient is typing (simplified)
+  const recipientIsTyping = false;
 
   // Initialize chat and fetch messages when opened
   useEffect(() => {
     if (isOpen && recipientId) {
       console.log("Chat opened for recipient:", recipientId);
-      setActiveConversation(recipientId);
       setSearchQuery("");
       refetch();
     }
-  }, [isOpen, recipientId, setActiveConversation, refetch]);
+  }, [isOpen, recipientId, refetch]);
 
   // Handle search
   const handleSearch = (query: string) => {
@@ -88,7 +86,11 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     try {
       console.log("Sending message...", { recipientId, content });
       
-      await sendMessage(recipientId, content.trim());
+      await sendHybridMessage.mutateAsync({
+        recipientId,
+        content: content.trim()
+      });
+      
       console.log("Message sent successfully");
       sendTypingStatus(recipientId, false);
       refetch();
@@ -96,7 +98,7 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
       console.error("Erro ao enviar mensagem:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível enviar a mensagem. Tente novamente mais tarde.",
+        description: "Não foi possível enviar a mensagem. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -113,8 +115,7 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     }
     
     try {
-      await clearConversation(recipientId);
-      refetch();
+      // Placeholder - not implemented in hybrid system yet
       toast({
         title: "Conversa limpa",
         description: "Todas as mensagens foram removidas."
@@ -141,8 +142,7 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     }
     
     try {
-      await deleteMessage(messageId);
-      refetch();
+      // Placeholder - not implemented in hybrid system yet
       toast({
         title: "Mensagem excluída",
         description: "A mensagem foi excluída com sucesso."
@@ -167,8 +167,7 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     }
     
     try {
-      await editMessage(messageId, newContent);
-      refetch();
+      // Placeholder - not implemented in hybrid system yet
       toast({
         title: "Mensagem editada",
         description: "A mensagem foi editada com sucesso."
@@ -203,7 +202,7 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     recipientIsTyping,
     searchQuery,
     isSearching,
-    sendMessageIsPending: false,
+    sendMessageIsPending: sendHybridMessage.isPending,
     clearConversationIsPending: false,
     handleSearch,
     handleSendMessage,

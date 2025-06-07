@@ -1,13 +1,10 @@
 
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { Message, ChatUser, MessageType } from '@/types/messages';
+import { Message, ChatUser } from '@/types/messages';
 import { useHybridMessages } from './useHybridMessages';
 
 export const useSimpleChat = () => {
-  const [conversations, setConversations] = useState<ChatUser[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const { user } = useAuth();
 
@@ -28,19 +25,20 @@ export const useSimpleChat = () => {
   });
 
   const getConversations = () => {
-    return useQuery({
-      queryKey: ['conversations'],
-      queryFn: async () => chatUsers,
-      enabled: false, // Use hybrid system instead
-    });
+    return {
+      data: chatUsers,
+      isLoading: isLoadingChatUsers,
+      error: null,
+      refetch: () => {}
+    };
   };
 
   const getConversationMessages = (userId: string) => {
     return getHybridConversation(userId);
   };
 
-  const sendMessage = useMutation({
-    mutationFn: async ({ 
+  const sendMessage = {
+    mutateAsync: async ({ 
       recipientId, 
       content 
     }: { 
@@ -49,19 +47,15 @@ export const useSimpleChat = () => {
     }) => {
       return sendHybridMessage.mutateAsync({ recipientId, content });
     },
-    onSuccess: () => {
-      // Hybrid system handles invalidation
-    }
-  });
+    isPending: sendHybridMessage.isPending
+  };
 
-  const markAsRead = useMutation({
-    mutationFn: async (userId: string) => {
-      return markAsReadHybrid.mutateAsync(userId);
+  const markAsRead = {
+    mutate: (userId: string, options?: { onSuccess?: () => void; onError?: (error: any) => void }) => {
+      markAsReadHybrid.mutate(userId, options);
     },
-    onSuccess: () => {
-      // Hybrid system handles invalidation
-    },
-  });
+    isPending: markAsReadHybrid.isPending
+  };
 
   // Set active conversation for polling optimization
   const setActiveConversationId = (userId: string | null) => {

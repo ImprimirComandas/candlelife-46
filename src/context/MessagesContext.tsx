@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { useMessages } from '@/hooks/useMessages';
+import { useHybridMessages } from '@/hooks/useHybridMessages';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { Message, ChatUser } from '@/types/messages';
 
@@ -23,8 +23,8 @@ interface MessagesContextType {
   requestNotificationPermissions: () => Promise<boolean>;
   
   // Hooks for components
-  useChatUsers: ReturnType<typeof useMessages>['useChatUsers'];
-  useConversation: ReturnType<typeof useMessages>['useConversation'];
+  useChatUsers: () => { data: ChatUser[]; isLoading: boolean };
+  useConversation: (userId: string, searchQuery?: string) => any;
   showNotification: (message: Message) => Promise<void>;
   
   // Direct data access
@@ -40,26 +40,40 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activeConversation, setActiveConversationState] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const messagesHook = useMessages();
+  // Use hybrid system as the main data source
   const {
-    useChatUsers,
-    useConversation,
-    useSendMessage,
-    useMarkConversationAsRead,
-    useClearConversation,
-    useDeleteMessage,
-    useEditMessage,
-    showNotification,
     chatUsers,
     isLoadingChatUsers,
-    getTotalUnreadCount
-  } = messagesHook;
+    getConversation,
+    getTotalUnreadCount,
+    sendMessage: sendHybridMessage,
+    markAsRead: markAsReadHybrid,
+    isConnected
+  } = useHybridMessages({
+    activeConversation: activeConversation || undefined,
+    enableTypingIndicators: true,
+    pollingInterval: 3000
+  });
 
-  const sendMessageMutation = useSendMessage();
-  const markAsReadMutation = useMarkConversationAsRead();
-  const clearChatMutation = useClearConversation();
-  const deleteMsgMutation = useDeleteMessage();
-  const editMsgMutation = useEditMessage();
+  // Simple notification function
+  const showNotification = useCallback(async (message: Message) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+      return;
+    }
+
+    try {
+      const notification = new Notification('Nova mensagem', {
+        body: message.content,
+        icon: '/favicon.ico',
+        tag: `message-${message.id}`,
+        requireInteraction: false
+      });
+
+      setTimeout(() => notification.close(), 5000);
+    } catch (error) {
+      console.error('Error showing notification:', error);
+    }
+  }, []);
 
   // Handle new messages from realtime
   const handleNewMessage = useCallback(async (message: Message) => {
@@ -67,7 +81,6 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     
     // Show notification if not from current user
     if (message.sender_id !== user?.id) {
-      // Fallback to basic notification
       if (!activeConversation || message.sender_id !== activeConversation || document.hidden) {
         await showNotification(message);
       }
@@ -78,7 +91,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [user?.id, activeConversation, showNotification]);
 
   // Setup realtime
-  const { isConnected } = useRealtimeMessages({
+  const { isConnected: realtimeConnected } = useRealtimeMessages({
     activeConversation: activeConversation || undefined,
     onNewMessage: handleNewMessage,
     onMessageUpdate: useCallback((message: Message) => {
@@ -86,7 +99,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, [])
   });
 
-  // Request notification permissions (simplified)
+  // Request notification permissions
   const requestNotificationPermissions = useCallback(async (): Promise<boolean> => {
     if (!('Notification' in window)) return false;
     
@@ -112,18 +125,18 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Mark as read when opening conversation
     if (userId) {
       setTimeout(() => {
-        markAsReadMutation.mutate(userId, {
+        markAsReadHybrid.mutate(userId, {
           onSuccess: () => {
             setUnreadCount(prev => Math.max(0, prev - 1));
           }
         });
       }, 1000);
     }
-  }, [markAsReadMutation]);
+  }, [markAsReadHybrid]);
 
   const markConversationAsRead = useCallback(async (userId: string) => {
     return new Promise<void>((resolve, reject) => {
-      markAsReadMutation.mutate(userId, {
+      markAsReadHybrid.mutate(userId, {
         onSuccess: () => {
           setUnreadCount(prev => Math.max(0, prev - 1));
           resolve();
@@ -131,7 +144,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         onError: reject
       });
     });
-  }, [markAsReadMutation]);
+  }, [markAsReadHybrid]);
 
   const sendMessage = useCallback(async (
     recipientId: string, 
@@ -140,7 +153,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     console.log('📤 Sending message from context:', { recipientId, content: content.substring(0, 50) });
     
     return new Promise<void>((resolve, reject) => {
-      sendMessageMutation.mutate({
+      sendHybridMessage.mutate({
         recipientId,
         content
       }, {
@@ -154,39 +167,34 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       });
     });
-  }, [sendMessageMutation]);
+  }, [sendHybridMessage]);
 
+  // Simplified hooks for compatibility
+  const useChatUsers = useCallback(() => {
+    return { data: chatUsers, isLoading: isLoadingChatUsers };
+  }, [chatUsers, isLoadingChatUsers]);
+
+  const useConversation = useCallback((userId: string, searchQuery?: string) => {
+    return getConversation(userId, searchQuery);
+  }, [getConversation]);
+
+  // Placeholder functions for compatibility
   const clearConversation = useCallback(async (userId: string) => {
-    return new Promise<void>((resolve, reject) => {
-      clearChatMutation.mutate(userId, {
-        onSuccess: () => resolve(),
-        onError: reject
-      });
-    });
-  }, [clearChatMutation]);
+    console.log('Clear conversation not implemented in hybrid system');
+  }, []);
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    return new Promise<void>((resolve, reject) => {
-      deleteMsgMutation.mutate(messageId, {
-        onSuccess: () => resolve(),
-        onError: reject
-      });
-    });
-  }, [deleteMsgMutation]);
+    console.log('Delete message not implemented in hybrid system');
+  }, []);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
-    return new Promise<void>((resolve, reject) => {
-      editMsgMutation.mutate({ messageId, content }, {
-        onSuccess: () => resolve(),
-        onError: reject
-      });
-    });
-  }, [editMsgMutation]);
+    console.log('Edit message not implemented in hybrid system');
+  }, []);
 
   return (
     <MessagesContext.Provider value={{
       activeConversation,
-      isConnected,
+      isConnected: isConnected && realtimeConnected,
       unreadCount,
       setActiveConversation,
       markConversationAsRead,
