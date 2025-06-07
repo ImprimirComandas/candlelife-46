@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { useAuth } from './AuthContext';
 import { useHybridMessages } from '@/hooks/useHybridMessages';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { useToast } from '@/hooks/use-toast';
 import { Message, ChatUser } from '@/types/messages';
 import { audioService } from '@/services/AudioService';
 
@@ -38,6 +39,7 @@ const MessagesContext = createContext<MessagesContextType | undefined>(undefined
 
 export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [activeConversation, setActiveConversationState] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -56,28 +58,42 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     pollingInterval: 3000
   });
 
-  // Simple notification function
+  // Enhanced notification function with sender info
   const showNotification = useCallback(async (message: Message) => {
     if (!('Notification' in window) || Notification.permission !== 'granted') {
       return;
     }
 
     try {
-      const notification = new Notification('Nova mensagem', {
-        body: message.content,
-        icon: '/favicon.ico',
+      // Find sender info
+      const sender = chatUsers.find(user => user.id === message.sender_id);
+      const senderName = sender?.full_name || sender?.username || 'Usuário';
+      
+      // Show toast notification
+      toast({
+        title: `Nova mensagem de ${senderName}`,
+        description: message.content.length > 80 
+          ? message.content.substring(0, 80) + '...' 
+          : message.content,
+      });
+
+      const notification = new Notification(`Mensagem de ${senderName}`, {
+        body: message.content.length > 100 
+          ? message.content.substring(0, 100) + '...' 
+          : message.content,
+        icon: sender?.avatar_url || '/favicon.ico',
         tag: `message-${message.id}`,
         requireInteraction: false
       });
 
-      setTimeout(() => notification.close(), 5000);
+      setTimeout(() => notification.close(), 6000);
       
       // Play notification sound
       audioService.playMessageSound();
     } catch (error) {
       console.error('Error showing notification:', error);
     }
-  }, []);
+  }, [chatUsers, toast]);
 
   // Handle new messages from realtime
   const handleNewMessage = useCallback(async (message: Message) => {

@@ -1,51 +1,63 @@
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useHybridMessages } from '@/hooks/useHybridMessages';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
 import { audioService } from '@/services/AudioService';
+import { Message } from '@/types/messages';
 
 export const HybridNotifications = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const { getTotalUnreadCount } = useHybridMessages({
+  const { chatUsers, getTotalUnreadCount } = useHybridMessages({
     enableTypingIndicators: false,
-    pollingInterval: 30000 // Check for notifications every 30 seconds
+    pollingInterval: 30000
   });
 
-  // Monitor unread count and show notifications
-  useEffect(() => {
-    if (!user) return;
+  // Show notification for new messages
+  const showMessageNotification = useCallback(async (message: Message) => {
+    if (!user || message.sender_id === user.id) return;
+
+    // Find sender info
+    const sender = chatUsers.find(user => user.id === message.sender_id);
+    const senderName = sender?.full_name || sender?.username || 'Usuário';
     
-    const checkUnreadMessages = () => {
-      const unreadCount = getTotalUnreadCount();
-      
-      if (unreadCount > 0 && document.hidden) {
-        // Show browser notification when app is in background
-        if ('Notification' in window && Notification.permission === 'granted') {
-          const notification = new Notification('CandleLife', {
-            body: `Você tem ${unreadCount} mensagem${unreadCount > 1 ? 's' : ''} não lida${unreadCount > 1 ? 's' : ''}`,
-            icon: '/favicon.ico',
-            tag: 'unread-messages',
-            requireInteraction: false
-          });
+    // Show toast notification
+    toast({
+      title: `Nova mensagem de ${senderName}`,
+      description: message.content.length > 80 
+        ? message.content.substring(0, 80) + '...' 
+        : message.content,
+    });
 
-          setTimeout(() => notification.close(), 5000);
-          
-          // Play notification sound
-          audioService.playMessageSound();
-        }
-      }
-    };
+    // Show browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification(`Mensagem de ${senderName}`, {
+        body: message.content.length > 100 
+          ? message.content.substring(0, 100) + '...' 
+          : message.content,
+        icon: sender?.avatar_url || '/favicon.ico',
+        tag: `message-${message.id}`,
+        requireInteraction: false
+      });
 
-    // Check immediately and then periodically
-    checkUnreadMessages();
-    const interval = setInterval(checkUnreadMessages, 30000);
+      setTimeout(() => notification.close(), 6000);
+    }
+    
+    // Play notification sound
+    audioService.playMessageSound();
+  }, [user, chatUsers, toast]);
 
-    return () => clearInterval(interval);
-  }, [user, getTotalUnreadCount]);
+  // Setup realtime message notifications
+  const { isConnected } = useRealtimeMessages({
+    onNewMessage: showMessageNotification,
+    onMessageUpdate: useCallback((message: Message) => {
+      console.log('📝 Message updated:', message);
+    }, [])
+  });
 
   // Request notification permissions on mount
   useEffect(() => {
