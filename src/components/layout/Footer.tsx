@@ -24,17 +24,17 @@ export const Footer = () => {
   ];
 
   return (
-    <footer className="border-t bg-background/95 backdrop-blur-md">
-      <div className="w-full max-w-7xl mx-auto px-4 py-6">
+    <footer className="border-t bg-background/95 backdrop-blur-md py-3">
+      <div className="w-full max-w-7xl mx-auto px-4">
         {/* Main Action Buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-3">
           {mainButtons.map((button) => (
             <Link
               key={button.href}
               to={button.href}
-              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-accent transition-colors group"
+              className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-accent transition-colors group"
             >
-              <button.icon className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <button.icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
                 {button.label}
               </span>
@@ -42,10 +42,10 @@ export const Footer = () => {
           ))}
         </div>
 
-        <Separator className="my-4" />
+        <Separator className="my-2" />
 
         {/* Secondary Links */}
-        <div className="flex flex-wrap justify-center gap-4 mb-4 text-sm">
+        <div className="flex flex-wrap justify-center gap-3 mb-2 text-xs">
           <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
             Sobre
           </Link>
@@ -61,7 +61,7 @@ export const Footer = () => {
         </div>
 
         {/* Bottom section */}
-        <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0 text-center">
+        <div className="flex flex-col sm:flex-row justify-between items-center space-y-1 sm:space-y-0 text-center">
           <p className="text-xs text-muted-foreground">
             © {currentYear} CandleLife. Todos os direitos reservados.
           </p>

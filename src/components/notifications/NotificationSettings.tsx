@@ -27,10 +27,18 @@ export const NotificationSettings = () => {
 
   const handleToggle = async (key: string, value: boolean) => {
     await updatePreferences({ [key]: value });
+    toast({
+      title: "Configuração atualizada",
+      description: `Notificações de ${notificationTypes.find(t => t.key === key)?.label.toLowerCase()} ${value ? 'ativadas' : 'desativadas'}.`,
+    });
   };
 
   const handleTimeChange = async (field: 'quiet_hours_start' | 'quiet_hours_end', value: string) => {
     await updatePreferences({ [field]: value });
+    toast({
+      title: "Horário atualizado",
+      description: "Horário silencioso foi atualizado.",
+    });
   };
 
   const handleRequestPermissions = async () => {
@@ -62,23 +70,23 @@ export const NotificationSettings = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Bell className="h-4 w-4" />
             Configurações de Notificação
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Configure como e quando você quer receber notificações
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           {/* Permission Request */}
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div>
-              <h4 className="font-medium">Permissões do Navegador</h4>
-              <p className="text-sm text-muted-foreground">
+              <h4 className="font-medium text-sm">Permissões do Navegador</h4>
+              <p className="text-xs text-muted-foreground">
                 Permita notificações para receber alertas mesmo quando o app estiver fechado
               </p>
             </div>
@@ -86,6 +94,7 @@ export const NotificationSettings = () => {
               onClick={handleRequestPermissions}
               disabled={isLoading}
               variant="outline"
+              size="sm"
             >
               {isLoading ? 'Solicitando...' : 'Ativar'}
             </Button>
@@ -94,15 +103,15 @@ export const NotificationSettings = () => {
           <Separator />
 
           {/* Sound Settings */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Volume2 className="h-4 w-4" />
-              <Label className="text-base font-medium">Som</Label>
+              <Label className="text-sm font-medium">Som</Label>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="sound_enabled">Sons de notificação</Label>
-                <p className="text-sm text-muted-foreground">
+                <Label htmlFor="sound_enabled" className="text-sm">Sons de notificação</Label>
+                <p className="text-xs text-muted-foreground">
                   Reproduzir som quando receber notificações
                 </p>
               </div>
@@ -117,32 +126,34 @@ export const NotificationSettings = () => {
           <Separator />
 
           {/* Quiet Hours */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              <Label className="text-base font-medium">Horário Silencioso</Label>
+              <Label className="text-sm font-medium">Horário Silencioso</Label>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quiet_start">Início</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="quiet_start" className="text-xs">Início</Label>
                 <Input
                   id="quiet_start"
                   type="time"
                   value={preferences.quiet_hours_start}
                   onChange={(e) => handleTimeChange('quiet_hours_start', e.target.value)}
+                  className="text-sm"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="quiet_end">Fim</Label>
+              <div className="space-y-1">
+                <Label htmlFor="quiet_end" className="text-xs">Fim</Label>
                 <Input
                   id="quiet_end"
                   type="time"
                   value={preferences.quiet_hours_end}
                   onChange={(e) => handleTimeChange('quiet_hours_end', e.target.value)}
+                  className="text-sm"
                 />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Durante este período, você não receberá notificações sonoras
             </p>
           </div>
@@ -150,14 +161,14 @@ export const NotificationSettings = () => {
           <Separator />
 
           {/* Notification Types */}
-          <div className="space-y-4">
-            <Label className="text-base font-medium">Tipos de Notificação</Label>
-            <div className="space-y-4">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Tipos de Notificação</Label>
+            <div className="space-y-3">
               {notificationTypes.map((type) => (
                 <div key={type.key} className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor={type.key}>{type.label}</Label>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="space-y-0.5">
+                    <Label htmlFor={type.key} className="text-sm">{type.label}</Label>
+                    <p className="text-xs text-muted-foreground">
                       {type.description}
                     </p>
                   </div>

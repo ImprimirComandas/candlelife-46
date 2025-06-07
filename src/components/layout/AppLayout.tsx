@@ -45,16 +45,20 @@ const AppLayout = () => {
           {/* Main content with proper safe areas and mobile spacing */}
           <main className={`flex-1 overflow-auto min-h-0 ${
             isMobile 
-              ? 'mobile-content pb-20 pt-2' 
-              : 'p-0'
+              ? 'pb-24 pt-2' // Increased bottom padding for mobile to avoid overlap
+              : 'pb-16' // Bottom padding for desktop footer
           } ${isNative ? 'safe-area-top' : ''}`}>
-            <div className={`h-full ${!isMobile ? 'p-4' : 'p-2 pt-4'}`}>
+            <div className={`min-h-full ${!isMobile ? 'p-4' : 'p-2 pt-4'}`}>
               <Outlet />
             </div>
           </main>
 
-          {/* Footer - only on desktop */}
-          {!isMobile && <Footer />}
+          {/* Footer - only on desktop, positioned absolutely */}
+          {!isMobile && (
+            <div className="absolute bottom-0 left-0 right-0">
+              <Footer />
+            </div>
+          )}
         </SidebarInset>
       </div>
       {isMobile && <MobileBottomNavigation />}

@@ -49,9 +49,9 @@ const Dashboard = () => {
   });
 
   return (
-    <div className="w-full space-y-8 safe-area-top safe-area-bottom">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h1 className="text-2xl md:text-4xl font-bold my-[37px]">Resumo Financeiro</h1>
+    <div className="w-full space-y-6 safe-area-top safe-area-bottom">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <h1 className="text-xl md:text-2xl font-bold">Resumo Financeiro</h1>
       </div>
 
       {/* Date selector */}
@@ -75,17 +75,17 @@ const Dashboard = () => {
       {/* Transactions and values */}
       <RecentTransactions startDate={startDate} endDate={endDate} />
 
-      {/* Rounded button to add transaction - positioned above mobile footer */}
+      {/* Rounded button to add transaction - positioned correctly */}
       <Button 
         size="lg" 
         onClick={() => setIsModalOpen(true)} 
-        className={`fixed shadow-lg flex items-center justify-center z-40 rounded-full w-14 h-14 md:w-16 md:h-16 ${
+        className={`fixed shadow-lg flex items-center justify-center z-30 rounded-full w-12 h-12 md:w-14 md:h-14 ${
           isMobile 
-            ? 'bottom-20 right-6 safe-area-bottom' // Above mobile footer + safe area
-            : 'bottom-6 right-6' // Normal position on desktop
+            ? 'bottom-28 right-4' // Above mobile navigation
+            : 'bottom-20 right-6' // Above desktop footer
         }`}
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="w-5 h-5" />
       </Button>
 
       <ExpenseModal 
