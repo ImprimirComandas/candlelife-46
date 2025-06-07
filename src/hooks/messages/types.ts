@@ -1,6 +1,4 @@
 
-import { useAuth } from "@/context/AuthContext";
-
 export interface Message {
   id: string;
   content: string;
@@ -48,8 +46,3 @@ export interface UserTypingStatus {
   isTyping: boolean;
   lastTyped: Date;
 }
-
-export const useMessagesContext = () => {
-  const { user } = useAuth();
-  return { user };
-};
