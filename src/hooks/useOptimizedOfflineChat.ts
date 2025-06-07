@@ -1,6 +1,6 @@
 
 import { useState, useCallback, useEffect } from 'react';
-import { Message } from '@/types/messages';
+import { Message, MessageType, MessageStatus } from '@/types/messages';
 
 interface OfflineMessage extends Message {
   isOffline: boolean;
@@ -42,6 +42,8 @@ export const useOptimizedOfflineChat = () => {
       recipient_id: recipientId,
       created_at: new Date().toISOString(),
       read: false,
+      message_status: MessageStatus.SENDING,
+      message_type: MessageType.TEXT,
       isOffline: true,
       timestamp: Date.now()
     };

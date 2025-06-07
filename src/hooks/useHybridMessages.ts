@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from './use-toast';
-import { Message, ChatUser } from '@/types/messages';
+import { Message, ChatUser, MessageType, MessageStatus } from '@/types/messages';
 
 interface HybridMessagesConfig {
   activeConversation?: string;
@@ -80,6 +80,8 @@ export const useHybridMessages = ({
           content: userMessages[0].content,
           created_at: userMessages[0].created_at,
           read: userMessages[0].read,
+          message_status: MessageStatus.DELIVERED,
+          message_type: MessageType.TEXT,
         } as Message : undefined;
 
         return {
@@ -134,7 +136,13 @@ export const useHybridMessages = ({
           throw error;
         }
 
-        const messages = (data || []).reverse();
+        // Transform data to ensure all required Message properties
+        const messages: Message[] = (data || []).map(msg => ({
+          ...msg,
+          message_status: msg.message_status || MessageStatus.DELIVERED,
+          message_type: msg.message_type || MessageType.TEXT,
+        })).reverse();
+
         console.log(`✅ Loaded ${messages.length} messages for conversation`);
         return messages;
       },
@@ -157,7 +165,9 @@ export const useHybridMessages = ({
         .insert({
           sender_id: user.id,
           recipient_id: recipientId,
-          content: content.trim()
+          content: content.trim(),
+          message_type: MessageType.TEXT,
+          message_status: MessageStatus.SENT
         })
         .select()
         .single();
