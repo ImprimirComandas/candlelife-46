@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, MessageCircle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner";
-import { SimpleChatModal } from "@/components/chat/SimpleChatModal";
+import { ChatModal } from "@/components/chat/ChatModal";
 import { useChatSystem } from "@/hooks/useChatSystem";
 
 const ChatPage = () => {
@@ -176,9 +176,9 @@ const ChatPage = () => {
         )}
       </div>
 
-      {/* Chat Modal */}
+      {/* Chat Modal with full functionality */}
       {selectedUser && (
-        <SimpleChatModal
+        <ChatModal
           isOpen={isChatOpen}
           onOpenChange={setIsChatOpen}
           recipientId={selectedUser.id}
