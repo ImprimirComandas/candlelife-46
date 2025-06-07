@@ -81,7 +81,7 @@ const ChatConversationPage = () => {
           content: message.trim()
         });
       } else {
-        const offlineMessage = await sendMessageOffline(userId, message.trim(), selectedFile);
+        const offlineMessage = await sendMessageOffline(userId, message.trim(), selectedFile || undefined);
         if (offlineMessage) {
           hapticFeedback('light');
         }
@@ -250,7 +250,7 @@ const ChatConversationPage = () => {
                   const isMe = isMyMessage(msg.sender_id);
                   const nextMsg = dateMessages[index + 1];
                   const isLastInGroup = !nextMsg || nextMsg.sender_id !== msg.sender_id;
-                  const isPending = msg.message_status === 'sending';
+                  const isPending = (msg as any).message_status === 'sending';
                   
                   return (
                     <div

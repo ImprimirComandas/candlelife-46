@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { Message, ChatUser } from '@/types/messages';
+import { Message, ChatUser, MessageType } from '@/types/messages';
 import { ChatStorageService } from '@/services/ChatStorageService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -89,7 +89,7 @@ export const useOfflineChat = () => {
       created_at: new Date().toISOString(),
       read: false,
       message_status: 'sending' as any,
-      message_type: attachment ? 'file' : 'text',
+      message_type: attachment ? MessageType.FILE : MessageType.TEXT,
       attachment_url: attachment ? URL.createObjectURL(attachment) : undefined,
       file_name: attachment?.name,
       file_size: attachment?.size

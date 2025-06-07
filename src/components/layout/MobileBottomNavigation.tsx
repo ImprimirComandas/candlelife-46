@@ -11,13 +11,16 @@ import {
   Receipt,
   Globe,
   TrendingUp,
-  MoreHorizontal
+  MoreHorizontal,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNative } from "@/hooks/useNative";
 import { useAdvancedMessages } from "@/hooks/useAdvancedMessages";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Drawer,
   DrawerContent,
