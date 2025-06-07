@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { Message, ChatUser, MessageType } from '@/types/messages';
-import { FileUploadService } from '@/services/fileUploadService';
 import { notificationService } from '@/services/notificationService';
 
 export const useSimpleChat = () => {
@@ -91,40 +90,19 @@ export const useSimpleChat = () => {
   const sendMessage = useMutation({
     mutationFn: async ({ 
       recipientId, 
-      content, 
-      attachment 
+      content 
     }: { 
       recipientId: string; 
       content: string; 
-      attachment?: File;
     }) => {
       if (!user) throw new Error('Usuário não autenticado');
-
-      let attachmentUrl: string | undefined;
-      let fileName: string | undefined;
-      let fileSize: number | undefined;
-
-      if (attachment) {
-        try {
-          attachmentUrl = await FileUploadService.uploadMessageAttachment(attachment, user.id);
-          fileName = attachment.name;
-          fileSize = attachment.size;
-        } catch (error) {
-          console.error('Erro no upload do arquivo:', error);
-          throw new Error('Falha no upload do arquivo');
-        }
-      }
 
       const { data, error } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
           recipient_id: recipientId,
-          content,
-          message_type: attachment ? MessageType.FILE : MessageType.TEXT,
-          attachment_url: attachmentUrl,
-          file_name: fileName,
-          file_size: fileSize
+          content: content.trim()
         })
         .select()
         .single();

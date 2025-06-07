@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useMessagesContext } from "@/context/MessagesContext";
 import { useAuth } from "@/context/AuthContext";
@@ -63,13 +64,13 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     }, 500);
   };
 
-  const handleSendMessage = async (content: string, attachment?: File | null): Promise<void> => {
-    console.log("handleSendMessage called", { content, attachment, user: user?.id, recipientId });
+  const handleSendMessage = async (content: string): Promise<void> => {
+    console.log("handleSendMessage called", { content, user: user?.id, recipientId });
     
-    if ((!content.trim() && !attachment)) {
+    if (!content.trim()) {
       toast({
         title: "Erro",
-        description: "Digite uma mensagem ou anexe um arquivo para enviar",
+        description: "Digite uma mensagem para enviar",
         variant: "destructive",
       });
       return;
@@ -85,9 +86,9 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     }
 
     try {
-      console.log("Sending message...", { recipientId, content, attachment });
+      console.log("Sending message...", { recipientId, content });
       
-      await sendMessage(recipientId, content.trim() || " ", attachment || undefined);
+      await sendMessage(recipientId, content.trim());
       console.log("Message sent successfully");
       sendTypingStatus(recipientId, false);
       refetch();

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -11,7 +12,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { useSimpleChat } from "@/hooks/useSimpleChat";
 import { useOfflineChat } from "@/hooks/useOfflineChat";
-import { AttachmentSelector } from "@/components/chat/AttachmentSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNative } from "@/hooks/useNative";
 import { useUserPresence } from "@/hooks/useUserPresence";
@@ -33,7 +33,6 @@ const ChatConversationPage = () => {
   const { hapticFeedback } = useNative();
   
   const [message, setMessage] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -76,7 +75,7 @@ const ChatConversationPage = () => {
   }, [userId, markAsRead, isOnline]);
 
   const handleSendMessage = async () => {
-    if ((!message.trim() && !selectedFile) || !userId) return;
+    if (!message.trim() || !userId) return;
 
     try {
       if (isOnline) {
@@ -85,14 +84,13 @@ const ChatConversationPage = () => {
           content: message.trim()
         });
       } else {
-        const offlineMessage = await sendMessageOffline(userId, message.trim(), selectedFile || undefined);
+        const offlineMessage = await sendMessageOffline(userId, message.trim());
         if (offlineMessage) {
           hapticFeedback('light');
         }
       }
       
       setMessage("");
-      setSelectedFile(null);
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
@@ -339,16 +337,6 @@ const ChatConversationPage = () => {
 
       {/* Fixed Input Area */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-md border-t border-border/50 p-4 flex-shrink-0 safe-area-bottom">
-        {selectedFile && (
-          <div className="mb-3">
-            <AttachmentSelector
-              onFileSelect={setSelectedFile}
-              selectedFile={selectedFile}
-              onRemoveFile={() => setSelectedFile(null)}
-            />
-          </div>
-        )}
-        
         <div className="flex items-center gap-3 w-full">
           <Input
             value={message}
@@ -359,21 +347,13 @@ const ChatConversationPage = () => {
             disabled={sendMessageMutation.isPending}
           />
           
-          {!selectedFile && (
-            <AttachmentSelector
-              onFileSelect={setSelectedFile}
-              selectedFile={selectedFile}
-              onRemoveFile={() => setSelectedFile(null)}
-            />
-          )}
-          
           <Button
             size="icon"
             onClick={() => {
               handleSendMessage();
               hapticFeedback('light');
             }}
-            disabled={(!message.trim() && !selectedFile) || sendMessageMutation.isPending}
+            disabled={!message.trim() || sendMessageMutation.isPending}
             className="rounded-full flex-shrink-0"
           >
             {sendMessageMutation.isPending ? (
