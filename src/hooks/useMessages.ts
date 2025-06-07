@@ -48,8 +48,8 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
               content,
               created_at,
               read,
-              sender_profile:profiles!messages_sender_id_fkey(username, avatar_url),
-              recipient_profile:profiles!messages_recipient_id_fkey(username, avatar_url)
+              sender_profile:profiles!messages_sender_id_fkey(username, avatar_url, created_at, updated_at),
+              recipient_profile:profiles!messages_recipient_id_fkey(username, avatar_url, created_at, updated_at)
             `)
             .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
             .order('created_at', { ascending: false });
@@ -71,7 +71,11 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
               conversationMap.set(partnerId, {
                 id: partnerId,
                 username: partnerProfile?.username || 'Usuário',
-                avatar_url: partnerProfile?.avatar_url,
+                full_name: partnerProfile?.username || undefined,
+                avatar_url: partnerProfile?.avatar_url || undefined,
+                email: partnerProfile?.username || undefined,
+                created_at: partnerProfile?.created_at || new Date().toISOString(),
+                updated_at: partnerProfile?.updated_at || new Date().toISOString(),
                 last_message: {
                   id: msg.id,
                   content: msg.content,
@@ -83,7 +87,8 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
                   message_type: MessageType.TEXT,
                   deleted_by_recipient: false,
                   sender_username: partnerProfile?.username,
-                  sender_avatar_url: partnerProfile?.avatar_url
+                  sender_avatar_url: partnerProfile?.avatar_url,
+                  reactions: []
                 },
                 unread_count: 0
               });

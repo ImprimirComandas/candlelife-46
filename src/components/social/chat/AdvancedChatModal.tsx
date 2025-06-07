@@ -9,6 +9,7 @@ import { AdvancedChatMessages } from "./AdvancedChatMessages";
 import { AdvancedChatInput } from "./AdvancedChatInput";
 import { AdvancedTypingIndicator } from "./AdvancedTypingIndicator";
 import { DeleteConversationDialog } from "./DeleteConversationDialog";
+import { Message } from "@/types/messages";
 
 interface AdvancedChatModalProps {
   isOpen: boolean;
@@ -49,7 +50,33 @@ export const AdvancedChatModal = ({
   const markConversationAsRead = useMarkConversationAsRead();
   const clearConversation = useClearConversation();
 
-  const messages = conversationQuery.data?.messages || [];
+  // Map database types to Message interface
+  const messages: Message[] = (conversationQuery.data?.messages || []).map((msg: any) => ({
+    id: msg.id,
+    content: msg.content,
+    sender_id: msg.sender_id,
+    recipient_id: msg.recipient_id,
+    created_at: msg.created_at,
+    read: msg.read,
+    read_at: msg.read_at || undefined,
+    attachment_url: msg.attachment_url || undefined,
+    deleted_by_recipient: msg.deleted_by_recipient || false,
+    message_status: msg.message_status || 'sent',
+    message_type: msg.message_type || 'text',
+    edited_at: msg.edited_at || undefined,
+    delivered_at: msg.delivered_at || undefined,
+    edit_history: msg.edit_history || [],
+    reply_to_id: msg.reply_to_id || undefined,
+    deleted_at: msg.deleted_at || undefined,
+    is_soft_deleted: msg.is_soft_deleted || false,
+    sender_username: msg.sender_username || undefined,
+    sender_avatar_url: msg.sender_avatar_url || undefined,
+    file_name: msg.file_name || undefined,
+    file_size: msg.file_size || undefined,
+    duration: msg.duration || undefined,
+    reactions: msg.reactions || []
+  }));
+
   const hasMore = conversationQuery.data?.hasNextPage || false;
 
   const isRecipientOnline = isUserOnline(recipientId);
@@ -59,8 +86,7 @@ export const AdvancedChatModal = ({
     try {
       await sendMessage.mutateAsync({
         recipientId,
-        content,
-        attachmentUrl: attachment ? undefined : undefined // Handle file upload separately if needed
+        content
       });
       
       // Marcar como lendo esta conversa
