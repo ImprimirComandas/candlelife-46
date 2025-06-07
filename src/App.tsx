@@ -48,66 +48,79 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/change-password" element={<ChangePassword />} />
                   
-                  {/* Protected Routes */}
+                  {/* Protected Routes with AppLayout */}
                   <Route path="/dashboard" element={
                     <ProtectedRoute>
-                      <AppLayout><Dashboard /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<Dashboard />} />
+                  </Route>
                   
                   <Route path="/transactions" element={
                     <ProtectedRoute>
-                      <AppLayout><Transactions /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<Transactions />} />
+                  </Route>
                   
                   <Route path="/expenses" element={
                     <ProtectedRoute>
-                      <AppLayout><Expenses /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<Expenses />} />
+                  </Route>
                   
                   <Route path="/goals" element={
                     <ProtectedRoute>
-                      <AppLayout><Goals /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<Goals />} />
+                  </Route>
                   
                   <Route path="/settings" element={
                     <ProtectedRoute>
-                      <AppLayout><Settings /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<Settings />} />
+                  </Route>
                   
                   <Route path="/social" element={
                     <ProtectedRoute>
-                      <AppLayout><Social /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<Social />} />
+                  </Route>
                   
                   <Route path="/chat" element={
                     <ProtectedRoute>
-                      <AppLayout><ChatPage /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
-                  
-                  <Route path="/chat/:userId" element={
-                    <ProtectedRoute>
-                      <AppLayout><ChatConversation /></AppLayout>
-                    </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<ChatPage />} />
+                    <Route path=":userId" element={<ChatConversation />} />
+                  </Route>
                   
                   <Route path="/clients" element={
                     <ProtectedRoute>
-                      <AppLayout><Clients /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<Clients />} />
+                  </Route>
                   
                   <Route path="/invoiced" element={
                     <ProtectedRoute>
-                      <AppLayout><InvoicedTransactions /></AppLayout>
+                      <AppLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<InvoicedTransactions />} />
+                  </Route>
                   
                   <Route path="*" element={<NotFound />} />
                 </Routes>
