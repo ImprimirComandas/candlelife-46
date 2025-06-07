@@ -32,6 +32,8 @@ export const MobileBottomNavigation = () => {
   const isMobile = useIsMobile();
   const { hapticFeedback, isNative } = useNative();
   const { getTotalUnreadCount } = useAdvancedMessages();
+  const { signOut } = useAuth();
+  const { toast } = useToast();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const totalUnreadMessages = getTotalUnreadCount();
@@ -61,6 +63,24 @@ export const MobileBottomNavigation = () => {
 
   const handleNavClick = () => {
     hapticFeedback('light');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Logout realizado",
+        description: "Você foi desconectado com sucesso.",
+      });
+      hapticFeedback('light');
+      setIsDrawerOpen(false);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer logout.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!isMobile) return null;
@@ -157,6 +177,17 @@ export const MobileBottomNavigation = () => {
                   </Link>
                 );
               })}
+              
+              {/* Logout Button */}
+              <div className="border-t pt-2 mt-4">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 p-4 rounded-xl transition-all duration-200 active:scale-95 native-transition text-destructive hover:bg-destructive/10 w-full"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span className="font-medium">Sair</span>
+                </button>
+              </div>
             </div>
           </DrawerContent>
         </Drawer>
