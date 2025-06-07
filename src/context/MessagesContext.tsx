@@ -1,8 +1,9 @@
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useMessages } from '@/hooks/useMessages';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { useNotificationSystem } from '@/hooks/useNotificationSystem';
 import { Message, ChatUser } from '@/types/messages';
 
 interface MessagesContextType {
@@ -18,6 +19,9 @@ interface MessagesContextType {
   clearConversation: (userId: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   editMessage: (messageId: string, content: string) => Promise<void>;
+  
+  // Notification system
+  requestNotificationPermissions: () => Promise<boolean>;
   
   // Hooks for components
   useChatUsers: ReturnType<typeof useMessages>['useChatUsers'];
@@ -51,26 +55,46 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     getTotalUnreadCount
   } = useMessages();
 
+  // Inicializar sistema de notificações
+  const {
+    handleNewMessage: processNotification,
+    requestPermissions,
+    isInitialized: notificationSystemReady
+  } = useNotificationSystem();
+
   const sendMessage = useSendMessage();
   const markAsRead = useMarkConversationAsRead();
   const clearChat = useClearConversation();
   const deleteMsg = useDeleteMessage();
   const editMsg = useEditMessage();
 
-  // Handle new messages from realtime
-  const handleNewMessage = useCallback((message: Message) => {
+  // Handle new messages from realtime with enhanced notifications
+  const handleNewMessage = useCallback(async (message: Message) => {
     console.log('🔔 New message in context:', message);
     
-    // Show notification if not from current user and not in active conversation
+    // Show notification if not from current user
     if (message.sender_id !== user?.id) {
+      // Get sender info for notification
+      const senderInfo = chatUsers.find(u => u.id === message.sender_id) || {
+        id: message.sender_id,
+        username: 'Usuário',
+        avatar_url: null
+      };
+
+      // Process notification with sound and push
+      if (notificationSystemReady) {
+        await processNotification(message, senderInfo);
+      }
+
+      // Fallback to basic notification
       if (!activeConversation || message.sender_id !== activeConversation || document.hidden) {
-        showNotification(message);
+        await showNotification(message);
       }
     }
     
     // Update unread count
     setUnreadCount(prev => prev + 1);
-  }, [user?.id, activeConversation, showNotification]);
+  }, [user?.id, activeConversation, chatUsers, processNotification, notificationSystemReady, showNotification]);
 
   const handleMessageUpdate = useCallback((message: Message) => {
     console.log('📝 Message updated in context:', message);
@@ -82,6 +106,16 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     onNewMessage: handleNewMessage,
     onMessageUpdate: handleMessageUpdate
   });
+
+  // Auto-request permissions when user logs in
+  useEffect(() => {
+    if (user && notificationSystemReady) {
+      // Request permissions with a slight delay to avoid overwhelming the user
+      setTimeout(() => {
+        requestPermissions();
+      }, 2000);
+    }
+  }, [user, notificationSystemReady, requestPermissions]);
 
   const setActiveConversation = useCallback((userId: string | null) => {
     console.log('📱 Setting active conversation:', userId);
@@ -168,6 +202,7 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       clearConversation: clearConversationAction,
       deleteMessage: deleteMessageAction,
       editMessage: editMessageAction,
+      requestNotificationPermissions: requestPermissions,
       useChatUsers,
       useConversation,
       showNotification,

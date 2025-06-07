@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Outlet } from "react-router-dom";
 import { MobileBottomNavigation } from "./MobileBottomNavigation";
 import { Footer } from "./Footer";
+import { NotificationPermissionBanner } from "@/components/notifications/NotificationPermissionBanner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNative } from "@/hooks/useNative";
 import { useEffect } from "react";
@@ -56,6 +57,9 @@ const AppLayout = () => {
         </SidebarInset>
       </div>
       {isMobile && <MobileBottomNavigation />}
+      
+      {/* Notification Permission Banner */}
+      <NotificationPermissionBanner />
     </SidebarProvider>
   );
 };
