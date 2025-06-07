@@ -138,9 +138,29 @@ export const useHybridMessages = ({
 
         // Transform data to ensure all required Message properties
         const messages: Message[] = (data || []).map(msg => ({
-          ...msg,
-          message_status: msg.message_status || MessageStatus.DELIVERED,
-          message_type: msg.message_type || MessageType.TEXT,
+          id: msg.id,
+          content: msg.content,
+          sender_id: msg.sender_id,
+          recipient_id: msg.recipient_id,
+          created_at: msg.created_at,
+          read: msg.read,
+          read_at: msg.read_at || undefined, // Convert null to undefined
+          attachment_url: msg.attachment_url || undefined,
+          deleted_by_recipient: msg.deleted_by_recipient || false,
+          message_status: MessageStatus.DELIVERED, // Set default since DB might not have this
+          message_type: MessageType.TEXT, // Set default since DB might not have this
+          edited_at: msg.edited_at || undefined,
+          delivered_at: msg.delivered_at || undefined,
+          edit_history: msg.edit_history as any,
+          reply_to_id: msg.reply_to_id || undefined,
+          deleted_at: msg.deleted_at || undefined,
+          is_soft_deleted: msg.is_soft_deleted || false,
+          sender_username: msg.sender_username || undefined,
+          sender_avatar_url: msg.sender_avatar_url || undefined,
+          file_name: msg.file_name || undefined,
+          file_size: msg.file_size || undefined,
+          duration: msg.duration || undefined,
+          reactions: msg.reactions as any || []
         })).reverse();
 
         console.log(`✅ Loaded ${messages.length} messages for conversation`);
