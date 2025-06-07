@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '@/integrations/supabase/client';
+import { audioService } from './AudioService';
 
 class PushNotificationService {
   private initialized = false;
@@ -121,6 +122,9 @@ class PushNotificationService {
             }));
           }
         };
+
+        // Play notification sound
+        audioService.playNotificationSound();
       }
     } catch (error) {
       console.error('Error showing notification:', error);

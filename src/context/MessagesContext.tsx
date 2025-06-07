@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { useHybridMessages } from '@/hooks/useHybridMessages';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { Message, ChatUser } from '@/types/messages';
+import { audioService } from '@/services/AudioService';
 
 interface MessagesContextType {
   // State
@@ -70,6 +71,9 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
 
       setTimeout(() => notification.close(), 5000);
+      
+      // Play notification sound
+      audioService.playMessageSound();
     } catch (error) {
       console.error('Error showing notification:', error);
     }

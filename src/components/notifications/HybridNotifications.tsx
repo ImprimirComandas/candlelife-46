@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useHybridMessages } from '@/hooks/useHybridMessages';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
+import { audioService } from '@/services/AudioService';
 
 export const HybridNotifications = () => {
   const { user } = useAuth();
@@ -29,6 +30,9 @@ export const HybridNotifications = () => {
         });
 
         setTimeout(() => notification.close(), 5000);
+        
+        // Play notification sound
+        audioService.playMessageSound();
       }
     }
   }, [getTotalUnreadCount]);

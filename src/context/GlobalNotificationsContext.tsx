@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { audioService } from '@/services/AudioService';
 
 export type NotificationType = 
   | 'message' 
@@ -199,14 +200,10 @@ export const GlobalNotificationsProvider: React.FC<{ children: React.ReactNode }
 
       // Play sound if enabled
       if (preferences.sound_enabled) {
-        try {
-          const audio = new Audio('/notification-sound.mp3');
-          audio.volume = 0.3;
-          audio.play().catch(() => {
-            // Ignore audio play errors
-          });
-        } catch (error) {
-          // Ignore audio errors
+        if (type === 'system') {
+          audioService.playSystemSound();
+        } else {
+          audioService.playNotificationSound();
         }
       }
     }

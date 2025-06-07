@@ -1,5 +1,6 @@
 
 import { Message, ChatUser } from '@/types/messages';
+import { audioService } from './AudioService';
 
 export interface NotificationData {
   id: string;
@@ -74,6 +75,9 @@ class SimpleNotificationService {
       });
 
       setTimeout(() => nativeNotif.close(), 5000);
+      
+      // Play notification sound
+      audioService.playNotificationSound();
     } else if (Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
