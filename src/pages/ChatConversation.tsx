@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useEnhancedMessages } from "@/hooks/useEnhancedMessages";
+import { useMessagesContext } from "@/context/MessagesContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNative } from "@/hooks/useNative";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { ArrowLeft, Send, Loader2, Circle, Settings } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { EnhancedChatModal } from "@/components/chat/enhanced/EnhancedChatModal";
-import { useAdvancedMessages } from "@/hooks/useAdvancedMessages";
 import { useTypingIndicator } from "@/hooks/messages/useTypingIndicator";
 
 const ChatConversation = () => {
@@ -28,46 +27,35 @@ const ChatConversation = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { 
+    activeConversation,
     setActiveConversation,
-    useConversation,
-    useSendMessage,
-    useMarkConversationAsRead,
-    isConnected
-  } = useEnhancedMessages();
+    isConnected,
+    sendMessage,
+    useChatUsers,
+    useConversation
+  } = useMessagesContext();
 
-  const { useChatUsers } = useAdvancedMessages();
   const { sendTypingStatus, isUserTyping } = useTypingIndicator();
 
   const chatUsersQuery = useChatUsers();
   const conversationQuery = useConversation(userId || "");
-  const sendMessageMutation = useSendMessage();
-  const markAsRead = useMarkConversationAsRead();
 
   const messages = conversationQuery.data || [];
   const chatUsers = chatUsersQuery.data || [];
   const recipient = chatUsers.find(u => u.id === userId);
   const isRecipientTyping = isUserTyping(userId || "");
 
-  // Set active conversation and mark as read
+  // Set active conversation
   useEffect(() => {
     if (userId && user?.id) {
       console.log('📱 Setting active conversation:', userId);
       setActiveConversation(userId);
-      
-      const timer = setTimeout(() => {
-        markAsRead.mutate(userId, {
-          onError: (error) => {
-            console.log("Erro ao marcar conversa como lida:", error);
-          }
-        });
-      }, 1000);
 
       return () => {
-        clearTimeout(timer);
         setActiveConversation(null);
       };
     }
-  }, [userId, user?.id, setActiveConversation, markAsRead]);
+  }, [userId, user?.id, setActiveConversation]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -104,11 +92,7 @@ const ChatConversation = () => {
       // Stop typing indicator
       sendTypingStatus(userId, false);
       
-      await sendMessageMutation.mutateAsync({
-        recipientId: userId,
-        content: message.trim()
-      });
-      
+      await sendMessage(userId, message.trim());
       setMessage("");
     } catch (error) {
       console.error("Error sending message:", error);
@@ -276,19 +260,14 @@ const ChatConversation = () => {
               onKeyPress={handleKeyPress}
               placeholder="Digite sua mensagem..."
               className="flex-1 rounded-full"
-              disabled={sendMessageMutation.isPending}
             />
             <Button
               size="icon"
               onClick={handleSendMessage}
-              disabled={!message.trim() || sendMessageMutation.isPending}
+              disabled={!message.trim()}
               className="rounded-full native-transition active:scale-95"
             >
-              {sendMessageMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+              <Send className="h-4 w-4" />
             </Button>
           </div>
         </div>
