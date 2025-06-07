@@ -40,25 +40,24 @@ export const useSimpleChat = () => {
 
         // Count unread messages for each user
         const unreadCounts = new Map<string, number>();
-        const { data: unreadMessages } = await supabase
-          .from('messages')
-          .select('sender_id, count')
-          .eq('recipient_id', user.id)
-          .eq('read', false)
-          .groupBy('sender_id');
+        
+        for (const profile of profiles) {
+          const { count } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('recipient_id', user.id)
+            .eq('sender_id', profile.id)
+            .eq('read', false);
 
-        if (unreadMessages) {
-          unreadMessages.forEach(msg => {
-            unreadCounts.set(msg.sender_id, parseInt(msg.count));
-          });
+          unreadCounts.set(profile.id, count || 0);
         }
 
         const users: ChatUser[] = profiles.map(profile => ({
           id: profile.id,
           username: profile.username,
-          full_name: profile.full_name || undefined,
+          full_name: profile.username || undefined,
           avatar_url: profile.avatar_url || undefined,
-          email: profile.email || undefined,
+          email: profile.username || undefined,
           created_at: profile.created_at,
           updated_at: profile.updated_at,
           unread_count: unreadCounts.get(profile.id) || 0
@@ -105,7 +104,6 @@ export const useSimpleChat = () => {
       let fileName: string | undefined;
       let fileSize: number | undefined;
 
-      // Upload do arquivo se fornecido
       if (attachment) {
         try {
           attachmentUrl = await FileUploadService.uploadMessageAttachment(attachment, user.id);
@@ -160,14 +158,16 @@ export const useSimpleChat = () => {
     },
   });
 
+  const conversationsQuery = getConversations();
+
   return {
     conversations,
     getConversations,
     getConversationMessages,
     sendMessage,
     markAsRead,
-    chatUsers: conversations,
-    isLoadingChatUsers: false,
-    getTotalUnreadCount: () => conversations.reduce((total, user) => total + user.unread_count, 0)
+    chatUsers: conversationsQuery.data || [],
+    isLoadingChatUsers: conversationsQuery.isLoading,
+    getTotalUnreadCount: () => (conversationsQuery.data || []).reduce((total, user) => total + user.unread_count, 0)
   };
 };

@@ -15,7 +15,7 @@ import { AttachmentSelector } from "@/components/chat/AttachmentSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNative } from "@/hooks/useNative";
 import { useUserPresence } from "@/hooks/useUserPresence";
-import { notificationService } from "@/services/NotificationService";
+import { notificationService } from "@/services/notificationService";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -1,5 +1,5 @@
+
 import { Message, ChatUser } from '@/types/messages';
-import { supabase } from "@/integrations/supabase/client";
 
 export interface NotificationData {
   id: string;
@@ -24,6 +24,11 @@ class EnhancedNotificationService {
     this.loadStoredNotifications();
   }
 
+  initialize() {
+    // Initialize method for compatibility
+    this.initializeAudio();
+  }
+
   private async initializeAudio() {
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -36,7 +41,6 @@ class EnhancedNotificationService {
     if (!this.audioContext) return;
 
     try {
-      // Criar som de sino usando osciladores
       const oscillator1 = this.audioContext.createOscillator();
       const oscillator2 = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
@@ -45,11 +49,9 @@ class EnhancedNotificationService {
       oscillator2.connect(gainNode);
       gainNode.connect(this.audioContext.destination);
       
-      // Frequências do sino
       oscillator1.frequency.setValueAtTime(800, this.audioContext.currentTime);
       oscillator2.frequency.setValueAtTime(1000, this.audioContext.currentTime);
       
-      // Envelope do som
       gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
       gainNode.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.8);
@@ -92,18 +94,13 @@ class EnhancedNotificationService {
 
     this.notifications.unshift(newNotification);
     
-    // Manter apenas as últimas 50 notificações
     if (this.notifications.length > 50) {
       this.notifications = this.notifications.slice(0, 50);
     }
 
     this.saveNotifications();
     this.notifyListeners();
-
-    // Tocar som
     this.playBellSound();
-
-    // Mostrar notificação nativa se permitido
     this.showNativeNotification(newNotification);
 
     return newNotification;
@@ -120,7 +117,6 @@ class EnhancedNotificationService {
         tag: notification.id
       });
 
-      // Fechar automaticamente após 5 segundos
       setTimeout(() => nativeNotif.close(), 5000);
     } else if (Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
@@ -192,13 +188,21 @@ class EnhancedNotificationService {
     });
   }
 
-  // Método para notificações do sistema
   addSystemNotification(title: string, body: string) {
     return this.addNotification({
       title,
       body,
       type: 'system'
     });
+  }
+
+  async requestPushPermission(): Promise<boolean> {
+    if (!('Notification' in window)) return false;
+    
+    if (Notification.permission === 'granted') return true;
+    
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
   }
 }
 

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { Message, ChatUser } from '@/types/messages';
@@ -8,16 +9,57 @@ import { notificationService } from '@/services/notificationService';
 export const useAdvancedMessages = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   
-  // Add all the required methods
   const useConversation = (userId: string, searchTerm?: string) => {
-    // Implementation
+    return useQuery({
+      queryKey: ['conversation', userId, searchTerm],
+      queryFn: async () => {
+        if (!user) return { messages: [], hasNextPage: false };
+
+        let query = supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${user.id},sender_id.eq.${userId}`)
+          .or(`recipient_id.eq.${user.id},recipient_id.eq.${userId}`)
+          .order('created_at', { ascending: true });
+
+        if (searchTerm) {
+          query = query.ilike('content', `%${searchTerm}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        return {
+          messages: data || [],
+          hasNextPage: false
+        };
+      },
+    });
   };
 
   const useSendMessage = () => {
     return useMutation({
       mutationFn: async ({ content, recipientId }: { content: string; recipientId: string }) => {
-        // Implementation
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: user.id,
+            recipient_id: recipientId,
+            content,
+            message_type: 'text'
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['conversation'] });
       }
     });
   };
@@ -25,7 +67,16 @@ export const useAdvancedMessages = () => {
   const useEditMessage = () => {
     return useMutation({
       mutationFn: async ({ messageId, content }: { messageId: string; content: string }) => {
-        // Implementation
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase.rpc('edit_message', {
+          p_message_id: messageId,
+          p_user_id: user.id,
+          p_new_content: content
+        });
+
+        if (error) throw error;
+        return data;
       }
     });
   };
@@ -33,7 +84,15 @@ export const useAdvancedMessages = () => {
   const useDeleteMessage = () => {
     return useMutation({
       mutationFn: async (messageId: string) => {
-        // Implementation
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase.rpc('soft_delete_message', {
+          p_message_id: messageId,
+          p_user_id: user.id
+        });
+
+        if (error) throw error;
+        return data;
       }
     });
   };
@@ -41,7 +100,15 @@ export const useAdvancedMessages = () => {
   const useMarkConversationAsRead = () => {
     return useMutation({
       mutationFn: async (userId: string) => {
-        // Implementation
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase.rpc('mark_conversation_as_read_v2', {
+          p_recipient_id: user.id,
+          p_sender_id: userId
+        });
+
+        if (error) throw error;
+        return data;
       }
     });
   };
@@ -49,7 +116,15 @@ export const useAdvancedMessages = () => {
   const useClearConversation = () => {
     return useMutation({
       mutationFn: async (userId: string) => {
-        // Implementation
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase.rpc('clear_conversation', {
+          p_user_id: user.id,
+          p_other_user_id: userId
+        });
+
+        if (error) throw error;
+        return data;
       }
     });
   };
@@ -83,7 +158,6 @@ export const useAdvancedMessages = () => {
       }, async (payload) => {
         const newMessage = payload.new as Message;
         
-        // Buscar dados do remetente para a notificação
         const { data: senderData } = await supabase
           .from('profiles')
           .select('*')
@@ -91,15 +165,15 @@ export const useAdvancedMessages = () => {
           .single();
 
         if (senderData) {
-          // Adicionar notificação
           notificationService.addMessageNotification(newMessage, {
             id: senderData.id,
             username: senderData.username,
-            full_name: senderData.full_name,
-            avatar_url: senderData.avatar_url,
-            email: senderData.email || '',
+            full_name: senderData.username || '',
+            avatar_url: senderData.avatar_url || undefined,
+            email: senderData.username || '',
             created_at: senderData.created_at,
-            updated_at: senderData.updated_at
+            updated_at: senderData.updated_at,
+            unread_count: 0
           });
         }
 
