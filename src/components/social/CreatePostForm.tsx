@@ -35,7 +35,7 @@ export const CreatePostForm = ({ isOpen, onOpenChange }: CreatePostFormProps) =>
     try {
       await createPost.mutateAsync({
         content: content.trim(),
-        imageFile
+        imageFile: imageFile || undefined
       });
       
       setContent("");
