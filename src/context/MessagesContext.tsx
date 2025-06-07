@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useMessages } from '@/hooks/useMessages';
@@ -74,12 +73,15 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     
     // Show notification if not from current user
     if (message.sender_id !== user?.id) {
-      // Get sender info for notification
+      // Get sender info for notification with proper ChatUser type
       const senderInfo = chatUsers.find(u => u.id === message.sender_id) || {
         id: message.sender_id,
         username: 'Usuário',
-        avatar_url: null
-      };
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        unread_count: 0
+      } as ChatUser;
 
       // Process notification with sound and push
       if (notificationSystemReady) {
@@ -104,7 +106,9 @@ export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { isConnected } = useRealtimeMessages({
     activeConversation: activeConversation || undefined,
     onNewMessage: handleNewMessage,
-    onMessageUpdate: handleMessageUpdate
+    onMessageUpdate: useCallback((message: Message) => {
+      console.log('📝 Message updated in context:', message);
+    }, [])
   });
 
   // Auto-request permissions when user logs in
