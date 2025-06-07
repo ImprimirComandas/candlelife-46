@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useMessagesContext } from "@/context/MessagesContext";
 import { useAuth } from "@/context/AuthContext";
@@ -88,7 +87,7 @@ export const useChatMessages = ({ recipientId, isOpen }: UseChatMessagesProps) =
     try {
       console.log("Sending message...", { recipientId, content, attachment });
       
-      await sendMessage(recipientId, content.trim() || " ", attachment);
+      await sendMessage(recipientId, content.trim() || " ", attachment || undefined);
       console.log("Message sent successfully");
       sendTypingStatus(recipientId, false);
       refetch();

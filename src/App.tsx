@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { RealtimeProvider } from "@/context/RealtimeContext";
 import { Toaster } from "@/components/ui/toaster";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { AppLayout } from "@/components/layout/AppLayout";
+import AppLayout from "@/components/layout/AppLayout";
 
 // Pages
 import Index from "@/pages/Index";
@@ -38,7 +38,7 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+      <ThemeProvider>
         <AuthProvider>
           <RealtimeProvider>
             <MessagesProvider>

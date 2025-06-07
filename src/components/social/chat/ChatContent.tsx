@@ -1,4 +1,3 @@
-
 import { ChatMessages } from "./ChatMessages";
 import { TypingIndicator } from "./TypingIndicator";
 import { ChatInput } from "./ChatInput";
