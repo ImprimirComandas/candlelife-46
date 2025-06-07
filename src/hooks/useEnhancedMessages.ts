@@ -82,8 +82,7 @@ export const useEnhancedMessages = () => {
               read,
               message_status,
               edited_at,
-              attachment_url,
-              profiles:sender_id(username, avatar_url)
+              attachment_url
             `)
             .or(`and(sender_id.eq.${user.id},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${user.id})`)
             .eq('deleted_by_recipient', false)
@@ -101,24 +100,36 @@ export const useEnhancedMessages = () => {
             throw error;
           }
 
-          const messages: EnhancedMessage[] = (data || []).map(msg => ({
-            id: msg.id,
-            content: msg.content,
-            sender_id: msg.sender_id,
-            recipient_id: msg.recipient_id,
-            created_at: msg.created_at,
-            read: msg.read,
-            message_status: (msg.message_status as 'sending' | 'sent' | 'delivered' | 'read') || 'sent',
-            edited_at: msg.edited_at || undefined,
-            reactions: [],
-            message_type: 'text' as const,
-            attachment_url: msg.attachment_url || undefined,
-            file_name: undefined,
-            file_size: undefined,
-            duration: undefined,
-            sender_username: Array.isArray(msg.profiles) && msg.profiles.length > 0 ? msg.profiles[0].username : undefined,
-            sender_avatar_url: Array.isArray(msg.profiles) && msg.profiles.length > 0 ? msg.profiles[0].avatar_url : undefined
-          })).reverse();
+          // Get sender profiles separately to avoid join issues
+          const senderIds = [...new Set((data || []).map(msg => msg.sender_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .in('id', senderIds);
+
+          const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+          const messages: EnhancedMessage[] = (data || []).map(msg => {
+            const senderProfile = profilesMap.get(msg.sender_id);
+            return {
+              id: msg.id,
+              content: msg.content,
+              sender_id: msg.sender_id,
+              recipient_id: msg.recipient_id,
+              created_at: msg.created_at,
+              read: msg.read,
+              message_status: (msg.message_status as 'sending' | 'sent' | 'delivered' | 'read') || 'sent',
+              edited_at: msg.edited_at || undefined,
+              reactions: [],
+              message_type: 'text' as const,
+              attachment_url: msg.attachment_url || undefined,
+              file_name: undefined,
+              file_size: undefined,
+              duration: undefined,
+              sender_username: senderProfile?.username,
+              sender_avatar_url: senderProfile?.avatar_url
+            };
+          }).reverse();
 
           console.log('✅ Fetched', messages.length, 'messages for conversation');
           return messages;
