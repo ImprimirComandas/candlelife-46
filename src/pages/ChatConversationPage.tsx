@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -11,11 +10,10 @@ import { ArrowLeft, Send, Loader2, MoreVertical, Wifi, WifiOff } from "lucide-re
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { useSimpleChat } from "@/hooks/useSimpleChat";
-import { useOfflineChat } from "@/hooks/useOfflineChat";
+import { useOptimizedOfflineChat } from "@/hooks/useOptimizedOfflineChat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNative } from "@/hooks/useNative";
 import { useUserPresence } from "@/hooks/useUserPresence";
-import { notificationService } from "@/services/notificationService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,24 +37,40 @@ const ChatConversationPage = () => {
   const { 
     getConversationMessages,
     sendMessage: sendMessageMutation,
-    markAsRead
+    markAsRead,
+    setActiveConversation,
+    isConnected,
+    sendTypingStatus
   } = useSimpleChat();
 
   const {
     isOnline,
-    sendMessageOffline,
-    getConversationMessages: getOfflineMessages,
-    cacheMessage
-  } = useOfflineChat();
+    cacheMessageOffline,
+    getOfflineMessages
+  } = useOptimizedOfflineChat();
 
   const conversationQuery = getConversationMessages(userId || "");
-  const messages = isOnline ? (conversationQuery.data || []) : getOfflineMessages(userId || "");
+  const onlineMessages = conversationQuery.data || [];
+  const offlineMessages = getOfflineMessages(userId || "");
+  
+  // Combine online and offline messages
+  const messages = [...onlineMessages, ...offlineMessages].sort((a, b) => 
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
   
   const recipientName = location.state?.username || "Usuário";
   const recipientAvatar = location.state?.avatar_url;
 
   const { getUserStatus } = useUserPresence();
   const recipientStatus = getUserStatus(userId || "");
+
+  // Set active conversation for hybrid optimization
+  useEffect(() => {
+    if (userId) {
+      setActiveConversation(userId);
+      return () => setActiveConversation(null);
+    }
+  }, [userId, setActiveConversation]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -67,27 +81,30 @@ const ChatConversationPage = () => {
 
   // Mark messages as read when online
   useEffect(() => {
-    if (userId && isOnline) {
+    if (userId && isOnline && isConnected) {
       setTimeout(() => {
         markAsRead.mutate(userId);
       }, 1000);
     }
-  }, [userId, markAsRead, isOnline]);
+  }, [userId, markAsRead, isOnline, isConnected]);
 
   const handleSendMessage = async () => {
     if (!message.trim() || !userId) return;
 
     try {
-      if (isOnline) {
+      if (isOnline && isConnected) {
         await sendMessageMutation.mutateAsync({
           recipientId: userId,
           content: message.trim()
         });
       } else {
-        const offlineMessage = await sendMessageOffline(userId, message.trim());
-        if (offlineMessage) {
-          hapticFeedback('light');
-        }
+        // Cache message for offline sending
+        cacheMessageOffline(userId, message.trim());
+        hapticFeedback('light');
+        toast({
+          title: "Mensagem salva",
+          description: "Será enviada quando a conexão for restaurada.",
+        });
       }
       
       setMessage("");
@@ -98,6 +115,12 @@ const ChatConversationPage = () => {
         description: "Não foi possível enviar a mensagem. Tente novamente.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleTyping = (isTyping: boolean) => {
+    if (userId) {
+      sendTypingStatus(userId, isTyping);
     }
   };
 
@@ -131,7 +154,7 @@ const ChatConversationPage = () => {
     }
   };
 
-  const isMyMessage = (senderId: string) => senderId === user?.id;
+  const isMyMessage = (senderId: string) => senderId === user?.id || senderId === 'current-user';
 
   const groupMessagesByDate = () => {
     const groups: { [key: string]: typeof messages } = {};
@@ -147,28 +170,6 @@ const ChatConversationPage = () => {
     return Object.entries(groups).sort(([a], [b]) => 
       new Date(a).getTime() - new Date(b).getTime()
     );
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'text-green-500';
-      case 'away':
-        return 'text-yellow-500';
-      default:
-        return 'text-gray-500';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'online':
-        return 'Online';
-      case 'away':
-        return 'Ausente';
-      default:
-        return 'Offline';
-    }
   };
 
   if (!userId) {
@@ -216,8 +217,7 @@ const ChatConversationPage = () => {
             </Avatar>
             {/* Status indicator */}
             <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${
-              recipientStatus === 'online' ? 'bg-green-500' :
-              recipientStatus === 'away' ? 'bg-yellow-500' : 'bg-gray-400'
+              isConnected && isOnline ? 'bg-green-500' : 'bg-gray-400'
             }`} />
           </div>
           
@@ -226,17 +226,15 @@ const ChatConversationPage = () => {
               {recipientName}
             </h2>
             <div className="flex items-center gap-2">
-              {isOnline ? (
+              {isOnline && isConnected ? (
                 <>
                   <Wifi className="h-3 w-3 text-green-500" />
-                  <p className={`text-xs ${getStatusColor(recipientStatus)}`}>
-                    {getStatusText(recipientStatus)}
-                  </p>
+                  <p className="text-xs text-green-500">Sistema Híbrido</p>
                 </>
               ) : (
                 <>
                   <WifiOff className="h-3 w-3 text-red-500" />
-                  <p className="text-xs text-red-500">Sem conexão</p>
+                  <p className="text-xs text-red-500">Modo Offline</p>
                 </>
               )}
             </div>
@@ -281,7 +279,7 @@ const ChatConversationPage = () => {
                   const isMe = isMyMessage(msg.sender_id);
                   const nextMsg = dateMessages[index + 1];
                   const isLastInGroup = !nextMsg || nextMsg.sender_id !== msg.sender_id;
-                  const isPending = (msg as any).message_status === 'sending';
+                  const isOffline = (msg as any).isOffline;
                   
                   return (
                     <div
@@ -295,7 +293,7 @@ const ChatConversationPage = () => {
                           isMe
                             ? 'bg-primary text-primary-foreground rounded-br-md'
                             : 'bg-muted rounded-bl-md'
-                        } ${isPending ? 'opacity-70' : ''}`}
+                        } ${isOffline ? 'opacity-70' : ''}`}
                       >
                         <p className="text-sm break-words">{msg.content}</p>
                         <div className="flex items-center justify-end gap-1 mt-1">
@@ -308,19 +306,19 @@ const ChatConversationPage = () => {
                           </p>
                           {isMe && (
                             <span className={`text-xs ${
-                              isPending
+                              isOffline
                                 ? 'text-primary-foreground/50'
                                 : msg.read 
                                 ? 'text-blue-500' 
                                 : 'text-primary-foreground/70'
                             }`}>
-                              {isPending ? '⏳' : msg.read ? '✓✓' : '✓'}
+                              {isOffline ? '📱' : msg.read ? '✓✓' : '✓'}
                             </span>
                           )}
                         </div>
-                        {isPending && (
+                        {isOffline && (
                           <Badge variant="secondary" className="absolute -top-2 -right-2 text-xs">
-                            Enviando...
+                            Offline
                           </Badge>
                         )}
                       </div>
@@ -340,8 +338,11 @@ const ChatConversationPage = () => {
         <div className="flex items-center gap-3 w-full">
           <Input
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              handleTyping(e.target.value.length > 0);
+            }}
+            onBlur={() => handleTyping(false)}
             placeholder="Digite sua mensagem..."
             className="flex-1 rounded-full min-w-0"
             disabled={sendMessageMutation.isPending}
