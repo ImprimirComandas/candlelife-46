@@ -29,7 +29,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<any>(null);
 
-  // Get chat users with unread counts
+  // Get chat users with simplified query
   const useChatUsers = () => {
     return useQuery({
       queryKey: messageKeys.chatUsers(),
@@ -39,63 +39,50 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         console.log('🔍 Fetching chat users for:', user.id);
 
         try {
+          // Simple query without complex joins
           const { data, error } = await supabase
             .from('messages')
-            .select(`
-              id,
-              sender_id,
-              recipient_id,
-              content,
-              created_at,
-              read,
-              sender_profile:profiles!messages_sender_id_fkey(username, avatar_url, created_at, updated_at),
-              recipient_profile:profiles!messages_recipient_id_fkey(username, avatar_url, created_at, updated_at)
-            `)
+            .select('sender_id, recipient_id, content, created_at')
             .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
             .order('created_at', { ascending: false });
 
           if (error) {
-            console.error('❌ Error fetching chat users:', error);
+            console.error('❌ Error fetching messages:', error);
             throw error;
           }
 
-          // Group messages by conversation partner
-          const conversationMap = new Map<string, ChatUser>();
-          
+          // Get unique user IDs
+          const userIds = new Set<string>();
           data?.forEach((msg: any) => {
-            const isFromMe = msg.sender_id === user.id;
-            const partnerId = isFromMe ? msg.recipient_id : msg.sender_id;
-            const partnerProfile = isFromMe ? msg.recipient_profile : msg.sender_profile;
-            
-            if (!conversationMap.has(partnerId)) {
-              conversationMap.set(partnerId, {
-                id: partnerId,
-                username: partnerProfile?.username || 'Usuário',
-                full_name: partnerProfile?.username || undefined,
-                avatar_url: partnerProfile?.avatar_url || undefined,
-                email: partnerProfile?.username || undefined,
-                created_at: partnerProfile?.created_at || new Date().toISOString(),
-                updated_at: partnerProfile?.updated_at || new Date().toISOString(),
-                last_message: {
-                  id: msg.id,
-                  content: msg.content,
-                  sender_id: msg.sender_id,
-                  recipient_id: msg.recipient_id,
-                  created_at: msg.created_at,
-                  read: msg.read,
-                  message_status: MessageStatus.SENT,
-                  message_type: MessageType.TEXT,
-                  deleted_by_recipient: false,
-                  sender_username: partnerProfile?.username,
-                  sender_avatar_url: partnerProfile?.avatar_url,
-                  reactions: []
-                },
-                unread_count: 0
-              });
-            }
+            if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
+            if (msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
           });
 
-          const chatUsers = Array.from(conversationMap.values());
+          if (userIds.size === 0) return [];
+
+          // Get user profiles separately
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, created_at, updated_at')
+            .in('id', Array.from(userIds));
+
+          if (profileError) {
+            console.error('❌ Error fetching profiles:', error);
+            throw profileError;
+          }
+
+          // Map to ChatUser format
+          const chatUsers: ChatUser[] = (profiles || []).map((profile: any) => ({
+            id: profile.id,
+            username: profile.username || 'Usuário',
+            full_name: profile.username || undefined,
+            avatar_url: profile.avatar_url || undefined,
+            email: profile.username || undefined,
+            created_at: profile.created_at || new Date().toISOString(),
+            updated_at: profile.updated_at || new Date().toISOString(),
+            unread_count: 0
+          }));
+
           console.log('✅ Fetched chat users:', chatUsers.length);
           return chatUsers;
         } catch (error) {
@@ -109,7 +96,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     });
   };
 
-  // Get conversation messages
+  // Get conversation messages with simplified query
   const useConversation = (otherUserId: string, searchTerm?: string) => {
     return useQuery({
       queryKey: messageKeys.conversationWithSearch(otherUserId, searchTerm),
@@ -121,19 +108,8 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         try {
           let query = supabase
             .from('messages')
-            .select(`
-              id,
-              content,
-              sender_id,
-              recipient_id,
-              created_at,
-              read,
-              message_status,
-              attachment_url,
-              sender_profile:profiles!messages_sender_id_fkey(username, avatar_url)
-            `)
+            .select('*')
             .or(`and(sender_id.eq.${user.id},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${user.id})`)
-            .eq('deleted_by_recipient', false)
             .order('created_at', { ascending: false })
             .limit(pageSize);
 
@@ -154,13 +130,11 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
             sender_id: msg.sender_id,
             recipient_id: msg.recipient_id,
             created_at: msg.created_at,
-            read: msg.read,
-            message_status: msg.message_status || MessageStatus.SENT,
+            read: msg.read || false,
+            message_status: MessageStatus.SENT,
             message_type: MessageType.TEXT,
             attachment_url: msg.attachment_url,
             deleted_by_recipient: false,
-            sender_username: msg.sender_profile?.username,
-            sender_avatar_url: msg.sender_profile?.avatar_url,
             reactions: []
           })).reverse();
 
@@ -177,24 +151,20 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     });
   };
 
-  // Send message
+  // Send message with simplified mutation
   const useSendMessage = () => useMutation({
     mutationFn: async ({ 
       recipientId, 
       content, 
-      messageType = MessageType.TEXT,
       attachmentUrl,
       fileName,
-      fileSize,
-      duration
+      fileSize
     }: { 
       recipientId: string; 
       content: string; 
-      messageType?: MessageType;
       attachmentUrl?: string;
       fileName?: string;
       fileSize?: number;
-      duration?: number;
     }) => {
       if (!user) throw new Error('User not authenticated');
 
@@ -243,10 +213,12 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
 
       console.log('📖 Marking conversation as read with:', otherUserId);
 
-      const { error } = await supabase.rpc('mark_conversation_as_read_v2', {
-        p_recipient_id: user.id,
-        p_sender_id: otherUserId
-      });
+      const { error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('recipient_id', user.id)
+        .eq('sender_id', otherUserId)
+        .eq('read', false);
 
       if (error) {
         console.error('❌ Error marking as read:', error);
@@ -267,10 +239,10 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
 
       console.log('🗑️ Clearing conversation with:', otherUserId);
 
-      const { error } = await supabase.rpc('clear_conversation', {
-        p_user_id: user.id,
-        p_other_user_id: otherUserId
-      });
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .or(`and(sender_id.eq.${user.id},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${user.id})`);
 
       if (error) {
         console.error('❌ Error clearing conversation:', error);
@@ -294,10 +266,11 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
 
       console.log('🗑️ Deleting message:', messageId);
 
-      const { error } = await supabase.rpc('soft_delete_message', {
-        p_message_id: messageId,
-        p_user_id: user.id
-      });
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .eq('sender_id', user.id);
 
       if (error) {
         console.error('❌ Error deleting message:', error);
@@ -321,11 +294,11 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
 
       console.log('✏️ Editing message:', messageId);
 
-      const { error } = await supabase.rpc('edit_message', {
-        p_message_id: messageId,
-        p_user_id: user.id,
-        p_new_content: content
-      });
+      const { error } = await supabase
+        .from('messages')
+        .update({ content })
+        .eq('id', messageId)
+        .eq('sender_id', user.id);
 
       if (error) {
         console.error('❌ Error editing message:', error);

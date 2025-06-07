@@ -1,174 +1,90 @@
-
-import { useEffect, useRef, useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { notificationService } from '@/services/notificationService';
-import { pushNotificationService } from '@/services/PushNotificationService';
+import { Message, ChatUser } from '@/types/messages';
 
-export const useNotificationSystem = () => {
+interface NotificationSystemConfig {
+  soundEnabled?: boolean;
+  pushEnabled?: boolean;
+}
+
+export const useNotificationSystem = (config: NotificationSystemConfig = {}) => {
   const { user } = useAuth();
-  const [isVisible, setIsVisible] = useState(!document.hidden);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [permissions, setPermissions] = useState({
+    sound: config.soundEnabled ?? true,
+    push: config.pushEnabled ?? true,
+  });
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const lastNotificationTime = useRef<number>(0);
 
-  // Inicializar serviços de notificação
+  // Initialize the audio element
   useEffect(() => {
-    const initializeServices = async () => {
-      if (!user || isInitialized) return;
-
-      try {
-        // Inicializar serviços
-        await notificationService.initialize();
-        await pushNotificationService.initialize();
-        
-        // Configurar áudio de notificação
-        audioRef.current = new Audio('/notification-sound.mp3');
-        audioRef.current.volume = 0.5;
-        
-        setIsInitialized(true);
-        console.log('Notification services initialized');
-      } catch (error) {
-        console.error('Failed to initialize notification services:', error);
-      }
-    };
-
-    initializeServices();
-  }, [user, isInitialized]);
-
-  // Monitorar visibilidade da página
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      setIsVisible(!document.hidden);
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    audioRef.current = new Audio('/sounds/notification.mp3');
+    audioRef.current.preload = 'auto';
   }, []);
 
-  // Reproduzir som de notificação
-  const playNotificationSound = async () => {
-    if (!audioRef.current) return;
+  // Request notification permissions
+  const requestPermissions = useCallback(async () => {
+    if (!permissions.push) return true;
 
-    try {
-      // Evitar spam de notificações (mínimo 2 segundos entre notificações)
-      const now = Date.now();
-      if (now - lastNotificationTime.current < 2000) return;
-      
-      lastNotificationTime.current = now;
-      
-      audioRef.current.currentTime = 0;
-      await audioRef.current.play();
-    } catch (error) {
-      console.log('Could not play notification sound:', error);
-    }
-  };
-
-  // Mostrar notificação push
-  const showPushNotification = async (title: string, body: string, data?: any) => {
-    if (!isInitialized) return;
-
-    try {
-      await pushNotificationService.showLocalNotification(title, body, data);
-    } catch (error) {
-      console.error('Failed to show push notification:', error);
-    }
-  };
-
-  // Mostrar notificação no navegador
-  const showBrowserNotification = (title: string, body: string, data?: any) => {
-    if (!('Notification' in window) || Notification.permission !== 'granted') {
-      return;
-    }
-
-    const notification = new Notification(title, {
-      body,
-      icon: '/favicon.ico',
-      badge: '/notification-badge.png',
-      tag: 'message-notification',
-      requireInteraction: true,
-      data
-    });
-
-    notification.onclick = () => {
-      window.focus();
-      if (data?.senderId) {
-        window.dispatchEvent(new CustomEvent('open-chat', { 
-          detail: { 
-            userId: data.senderId,
-            userName: data.senderName,
-            userAvatar: data.senderAvatar
-          } 
-        }));
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        return permission === 'granted';
+      } else if (Notification.permission === 'granted') {
+        return true;
       }
-      notification.close();
-    };
-
-    // Auto-close após 5 segundos
-    setTimeout(() => notification.close(), 5000);
-  };
-
-  // Solicitar permissões
-  const requestPermissions = async () => {
-    try {
-      // Solicitar permissão para notificações do navegador
-      if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-
-      // Solicitar permissão para push notifications
-      await notificationService.requestPushPermission();
-      
-      return true;
-    } catch (error) {
-      console.error('Failed to request permissions:', error);
-      return false;
-    }
-  };
-
-  // Função principal para processar notificação de mensagem
-  const handleNewMessage = async (message: any, sender: any) => {
-    console.log('🔔 Processing notification:', { isVisible, message, sender });
-
-    const title = `Nova mensagem de ${sender.username || sender.name || 'Usuário'}`;
-    const body = message.content.length > 50 
-      ? message.content.substring(0, 50) + '...' 
-      : message.content;
-
-    const notificationData = {
-      senderId: sender.id,
-      senderName: sender.username || sender.name,
-      senderAvatar: sender.avatar_url,
-      messageId: message.id,
-      conversationId: message.sender_id
-    };
-
-    // Se o usuário não está vendo a página
-    if (!isVisible) {
-      // Mostrar notificação push (mobile/desktop)
-      await showPushNotification(title, body, notificationData);
-      
-      // Mostrar notificação do navegador (desktop)
-      showBrowserNotification(title, body, notificationData);
     }
 
-    // Sempre tocar som (mesmo se estiver visível, para feedback)
-    await playNotificationSound();
+    return false;
+  }, [permissions.push]);
 
-    // Atualizar badge count
-    try {
-      await pushNotificationService.updateBadgeCount(1);
-    } catch (error) {
-      console.log('Could not update badge count:', error);
+  // Play notification sound
+  const playNotificationSound = useCallback(() => {
+    if (permissions.sound && audioRef.current) {
+      audioRef.current.play().catch(error => {
+        console.warn("Failed to play notification sound:", error);
+      });
     }
-  };
+  }, [permissions.sound]);
+
+  // Show push notification
+  const showPushNotification = useCallback((message: Message, senderInfo: ChatUser) => {
+    if (!permissions.push) return;
+
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification(`Nova mensagem de ${senderInfo.username}`, {
+        body: message.content,
+        icon: senderInfo.avatar_url || '/favicon.ico',
+        badge: '/favicon.ico',
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      setTimeout(() => notification.close(), 5000);
+    }
+  }, [permissions.push]);
+
+  // Handle new message
+  const handleNewMessage = useCallback(async (message: Message, senderInfo: ChatUser) => {
+    playNotificationSound();
+    showPushNotification(message, senderInfo);
+  }, [playNotificationSound, showPushNotification]);
+
+  // Initialize the system
+  useEffect(() => {
+    if (user) {
+      setIsInitialized(true);
+    }
+  }, [user]);
 
   return {
-    isVisible,
     isInitialized,
-    handleNewMessage,
     requestPermissions,
-    playNotificationSound,
-    showPushNotification,
-    showBrowserNotification
+    handleNewMessage,
   };
 };
