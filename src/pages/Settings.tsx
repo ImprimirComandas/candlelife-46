@@ -1,217 +1,98 @@
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
+import { Palette, User, Lock, Image, ArrowLeft } from "lucide-react";
+import { ThemeSettings } from "@/components/settings/ThemeSettings";
+import { ProfileSettings } from "@/components/settings/ProfileSettings";
+import { AvatarSettings } from "@/components/settings/AvatarSettings";
+import { SecuritySettings } from "@/components/settings/SecuritySettings";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { 
-  User, 
-  Bell, 
-  Shield, 
-  Palette, 
-  Globe, 
-  CreditCard,
-  Download,
-  LogOut,
-  Camera,
-  Mail,
-  Phone,
-  Lock
-} from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const Settings = () => {
-  const isMobile = useIsMobile();
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    marketing: false
-  });
-  const [darkMode, setDarkMode] = useState(false);
-
-  const settingsSections = [
-    {
-      id: "profile",
-      title: "Perfil",
-      icon: User,
-      items: [
-        { label: "Nome completo", value: "João Silva", type: "input" },
-        { label: "Email", value: "joao@email.com", type: "input" },
-        { label: "Telefone", value: "(11) 99999-9999", type: "input" },
-        { label: "Foto do perfil", value: "", type: "avatar" }
-      ]
-    },
-    {
-      id: "notifications",
-      title: "Notificações",
-      icon: Bell,
-      items: [
-        { label: "Notificações por email", value: notifications.email, type: "switch", key: "email" },
-        { label: "Notificações push", value: notifications.push, type: "switch", key: "push" },
-        { label: "Emails de marketing", value: notifications.marketing, type: "switch", key: "marketing" }
-      ]
-    },
-    {
-      id: "security",
-      title: "Segurança",
-      icon: Shield,
-      items: [
-        { label: "Alterar senha", value: "", type: "button", action: "change-password" },
-        { label: "Autenticação de dois fatores", value: false, type: "switch" },
-        { label: "Sessões ativas", value: "3 dispositivos", type: "info" }
-      ]
-    },
-    {
-      id: "appearance",
-      title: "Aparência",
-      icon: Palette,
-      items: [
-        { label: "Modo escuro", value: darkMode, type: "switch", key: "darkMode" },
-        { label: "Idioma", value: "Português (Brasil)", type: "select" }
-      ]
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get active tab from URL hash or localStorage, or default to "profile"
+  const getInitialTab = () => {
+    const hashTab = location.hash?.replace('#', '');
+    if (hashTab && ['profile', 'theme', 'avatar', 'security'].includes(hashTab)) {
+      return hashTab;
     }
-  ];
-
-  const handleNotificationChange = (key: string, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [key]: value }));
+    
+    const savedTab = localStorage.getItem('settings-tab');
+    if (savedTab && ['profile', 'theme', 'avatar', 'security'].includes(savedTab)) {
+      return savedTab;
+    }
+    
+    return 'profile';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  
+  // Update URL hash and localStorage when tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    localStorage.setItem('settings-tab', value);
+    
+    // Update URL hash without causing navigation/reload
+    window.history.replaceState(null, '', `#${value}`);
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border/50 p-4">
-        <h1 className="text-2xl font-bold">Configurações</h1>
+    <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-8 animate-fade-in">
+      <div className="flex items-center gap-4">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => navigate(-1)}
+          className="rounded-full"
+          aria-label="Voltar"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="text-3xl md:text-4xl font-bold text-foreground">Configurações</h1>
       </div>
+      
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-8">
+          <TabsTrigger value="profile" className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            <span>Perfil</span>
+          </TabsTrigger>
+          <TabsTrigger value="theme" className="flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            <span>Tema</span>
+          </TabsTrigger>
+          <TabsTrigger value="avatar" className="flex items-center gap-2">
+            <Image className="w-4 h-4" />
+            <span>Avatar</span>
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            <span>Segurança</span>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Settings Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-6">
-        {/* Profile Summary */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Avatar className="h-20 w-20">
-                  <AvatarFallback className="text-xl">JS</AvatarFallback>
-                </Avatar>
-                <Button size="icon" className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full">
-                  <Camera className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold">João Silva</h3>
-                <p className="text-muted-foreground">joao@email.com</p>
-                <Badge variant="secondary" className="mt-2">
-                  Plano Premium
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
+        <Card className="p-6 border-border rounded-xl shadow-sm">
+          <TabsContent value="profile" className="mt-0">
+            <ProfileSettings />
+          </TabsContent>
+          
+          <TabsContent value="theme" className="mt-0">
+            <ThemeSettings />
+          </TabsContent>
+          
+          <TabsContent value="avatar" className="mt-0">
+            <AvatarSettings />
+          </TabsContent>
+          
+          <TabsContent value="security" className="mt-0">
+            <SecuritySettings />
+          </TabsContent>
         </Card>
-
-        {/* Settings Sections */}
-        {settingsSections.map((section) => (
-          <Card key={section.id}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <section.icon className="h-5 w-5" />
-                {section.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {section.items.map((item, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">{item.label}</Label>
-                    
-                    {item.type === "input" && (
-                      <Input 
-                        defaultValue={item.value as string}
-                        className="w-48"
-                      />
-                    )}
-                    
-                    {item.type === "switch" && (
-                      <Switch
-                        checked={item.value as boolean}
-                        onCheckedChange={(checked) => {
-                          if (item.key === "darkMode") {
-                            setDarkMode(checked);
-                          } else if (item.key && section.id === "notifications") {
-                            handleNotificationChange(item.key, checked);
-                          }
-                        }}
-                      />
-                    )}
-                    
-                    {item.type === "button" && (
-                      <Button variant="outline" size="sm">
-                        {item.action === "change-password" ? "Alterar" : "Ação"}
-                      </Button>
-                    )}
-                    
-                    {item.type === "info" && (
-                      <span className="text-sm text-muted-foreground">{item.value as string}</span>
-                    )}
-                    
-                    {item.type === "select" && (
-                      <Button variant="outline" size="sm">
-                        {item.value as string}
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {index < section.items.length - 1 && <Separator className="mt-4" />}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
-
-        {/* Additional Options */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Download className="h-5 w-5" />
-              Dados e Privacidade
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Exportar dados</Label>
-              <Button variant="outline" size="sm">
-                Baixar
-              </Button>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <Label>Excluir conta</Label>
-              <Button variant="destructive" size="sm">
-                Excluir
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Logout */}
-        <Card>
-          <CardContent className="p-4">
-            <Button variant="outline" className="w-full gap-2">
-              <LogOut className="h-4 w-4" />
-              Sair da conta
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* App Info */}
-        <div className="text-center text-sm text-muted-foreground py-4">
-          <p>CandleLife v1.0.0</p>
-          <p>© 2024 Todos os direitos reservados</p>
-        </div>
-      </div>
+      </Tabs>
     </div>
   );
 };
