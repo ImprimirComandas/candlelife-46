@@ -1,4 +1,3 @@
-
 export enum MessageStatus {
   SENDING = 'sending',
   SENT = 'sent',
@@ -57,12 +56,16 @@ export interface MessageReaction {
 export interface ChatUser {
   id: string;
   username: string;
+  full_name?: string;
   avatar_url?: string;
-  last_message?: Message;
+  email?: string;
+  created_at: string;
+  updated_at: string;
   unread_count: number;
   is_typing?: boolean;
   presence?: UserPresence;
   last_seen?: string;
+  last_message?: Message;
 }
 
 export interface UserPresence {

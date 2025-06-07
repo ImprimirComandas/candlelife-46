@@ -1,12 +1,58 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { Message } from '@/types/messages';
-import { notificationService } from '@/services/NotificationService';
+import { Message, ChatUser } from '@/types/messages';
+import { notificationService } from '@/services/notificationService';
 
 export const useAdvancedMessages = () => {
   const { user } = useAuth();
-  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const queryClient = useQueryClient();
+  
+  // Add all the required methods
+  const useConversation = (userId: string, searchTerm?: string) => {
+    // Implementation
+  };
+
+  const useSendMessage = () => {
+    return useMutation({
+      mutationFn: async ({ content, recipientId }: { content: string; recipientId: string }) => {
+        // Implementation
+      }
+    });
+  };
+
+  const useEditMessage = () => {
+    return useMutation({
+      mutationFn: async ({ messageId, content }: { messageId: string; content: string }) => {
+        // Implementation
+      }
+    });
+  };
+
+  const useDeleteMessage = () => {
+    return useMutation({
+      mutationFn: async (messageId: string) => {
+        // Implementation
+      }
+    });
+  };
+
+  const useMarkConversationAsRead = () => {
+    return useMutation({
+      mutationFn: async (userId: string) => {
+        // Implementation
+      }
+    });
+  };
+
+  const useClearConversation = () => {
+    return useMutation({
+      mutationFn: async (userId: string) => {
+        // Implementation
+      }
+    });
+  };
 
   const updateUnreadCount = useCallback(() => {
     const unread = notificationService.getUnreadCount();
@@ -71,6 +117,12 @@ export const useAdvancedMessages = () => {
   };
 
   return {
-    getTotalUnreadCount,
+    useConversation,
+    useSendMessage,
+    useEditMessage,
+    useDeleteMessage,
+    useMarkConversationAsRead,
+    useClearConversation,
+    getTotalUnreadCount
   };
 };

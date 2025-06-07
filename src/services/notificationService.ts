@@ -1,215 +1,205 @@
+import { Message, ChatUser } from '@/types/messages';
 import { supabase } from "@/integrations/supabase/client";
 
-export class NotificationService {
-  private static instance: NotificationService;
-  private registration: ServiceWorkerRegistration | null = null;
-  private isPageVisible = true;
-  private notificationQueue: any[] = [];
+export interface NotificationData {
+  id: string;
+  title: string;
+  body: string;
+  avatar?: string;
+  timestamp: string;
+  messageId?: string;
+  senderId?: string;
+  conversationId?: string;
+  read: boolean;
+  type: 'message' | 'system' | 'transaction';
+}
 
-  static getInstance(): NotificationService {
-    if (!NotificationService.instance) {
-      NotificationService.instance = new NotificationService();
+class EnhancedNotificationService {
+  private notifications: NotificationData[] = [];
+  private listeners: ((notifications: NotificationData[]) => void)[] = [];
+  private audioContext: AudioContext | null = null;
+
+  constructor() {
+    this.initializeAudio();
+    this.loadStoredNotifications();
+  }
+
+  private async initializeAudio() {
+    try {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch (error) {
+      console.warn('Web Audio API não suportado:', error);
     }
-    return NotificationService.instance;
   }
 
-  async initialize() {
-    await this.setupServiceWorker();
-    this.setupPageVisibility();
-    this.setupPermissions();
-  }
+  private playBellSound() {
+    if (!this.audioContext) return;
 
-  private async setupServiceWorker() {
-    if ('serviceWorker' in navigator) {
-      try {
-        this.registration = await navigator.serviceWorker.register('/sw.js');
-        console.log('Service Worker registered');
-      } catch (error) {
-        console.error('Service Worker registration failed:', error);
-      }
-    }
-  }
-
-  private setupPageVisibility() {
-    document.addEventListener('visibilitychange', () => {
-      this.isPageVisible = !document.hidden;
+    try {
+      // Criar som de sino usando osciladores
+      const oscillator1 = this.audioContext.createOscillator();
+      const oscillator2 = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
       
-      if (this.isPageVisible) {
-        // Página ficou visível, processar fila de notificações
-        this.processNotificationQueue();
-      }
-    });
-  }
-
-  private async setupPermissions() {
-    if ('Notification' in window) {
-      if (Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
+      oscillator1.connect(gainNode);
+      oscillator2.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      // Frequências do sino
+      oscillator1.frequency.setValueAtTime(800, this.audioContext.currentTime);
+      oscillator2.frequency.setValueAtTime(1000, this.audioContext.currentTime);
+      
+      // Envelope do som
+      gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.8);
+      
+      oscillator1.start(this.audioContext.currentTime);
+      oscillator2.start(this.audioContext.currentTime);
+      oscillator1.stop(this.audioContext.currentTime + 0.8);
+      oscillator2.stop(this.audioContext.currentTime + 0.8);
+    } catch (error) {
+      console.warn('Erro ao reproduzir som:', error);
     }
   }
 
-  async requestPushPermission(): Promise<boolean> {
-    if (!('Notification' in window) || !this.registration) {
-      return false;
+  private loadStoredNotifications() {
+    try {
+      const stored = localStorage.getItem('app_notifications');
+      if (stored) {
+        this.notifications = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.warn('Erro ao carregar notificações:', error);
     }
+  }
 
-    const permission = await Notification.requestPermission();
+  private saveNotifications() {
+    try {
+      localStorage.setItem('app_notifications', JSON.stringify(this.notifications));
+    } catch (error) {
+      console.warn('Erro ao salvar notificações:', error);
+    }
+  }
+
+  addNotification(notification: Omit<NotificationData, 'id' | 'timestamp' | 'read'>) {
+    const newNotification: NotificationData = {
+      ...notification,
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+
+    this.notifications.unshift(newNotification);
     
-    if (permission === 'granted') {
-      try {
-        const subscription = await this.registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: this.urlBase64ToUint8Array(
-            // Você precisará adicionar sua chave VAPID aqui
-            'YOUR_VAPID_PUBLIC_KEY'
-          )
-        });
-
-        // Salvar token no banco
-        await this.savePushToken(subscription);
-        return true;
-      } catch (error) {
-        console.error('Failed to subscribe to push notifications:', error);
-        return false;
-      }
+    // Manter apenas as últimas 50 notificações
+    if (this.notifications.length > 50) {
+      this.notifications = this.notifications.slice(0, 50);
     }
 
-    return false;
+    this.saveNotifications();
+    this.notifyListeners();
+
+    // Tocar som
+    this.playBellSound();
+
+    // Mostrar notificação nativa se permitido
+    this.showNativeNotification(newNotification);
+
+    return newNotification;
   }
 
-  private async savePushToken(subscription: PushSubscription) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  private async showNativeNotification(notification: NotificationData) {
+    if (!('Notification' in window)) return;
 
-    const token = JSON.stringify(subscription);
-    const platform = this.detectPlatform();
-
-    await supabase
-      .from('push_tokens')
-      .upsert({
-        user_id: user.id,
-        token,
-        platform,
-        device_info: navigator.userAgent
+    if (Notification.permission === 'granted') {
+      const nativeNotif = new Notification(notification.title, {
+        body: notification.body,
+        icon: notification.avatar || '/notification-badge.png',
+        badge: '/notification-badge.png',
+        tag: notification.id
       });
-  }
 
-  private detectPlatform(): 'web' | 'ios' | 'android' {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
-      return 'ios';
-    } else if (userAgent.includes('android')) {
-      return 'android';
-    }
-    return 'web';
-  }
-
-  showMessageNotification(title: string, body: string, data?: any) {
-    if (this.isPageVisible) {
-      // Usuário está ativo, mostrar notificação in-app
-      this.showInAppNotification({ content: body }, { username: title.replace('Nova mensagem de ', ''), ...data });
-    } else {
-      // Usuário está em background, mostrar notificação do sistema
-      this.showSystemNotification({ content: body }, { username: title.replace('Nova mensagem de ', ''), ...data });
-    }
-  }
-
-  showNotification(message: any, sender: any) {
-    if (this.isPageVisible) {
-      // Usuário está ativo, mostrar notificação in-app
-      this.showInAppNotification(message, sender);
-    } else {
-      // Usuário está em background, mostrar notificação do sistema
-      this.showSystemNotification(message, sender);
-    }
-  }
-
-  private showInAppNotification(message: any, sender: any) {
-    // Criar notificação customizada na interface
-    const notification = document.createElement('div');
-    notification.className = 'fixed top-4 right-4 bg-primary text-primary-foreground p-4 rounded-lg shadow-lg z-50 animate-slide-in';
-    notification.innerHTML = `
-      <div class="flex items-center gap-3">
-        <img src="${sender.avatar_url || '/default-avatar.png'}" alt="${sender.username}" class="w-8 h-8 rounded-full">
-        <div>
-          <p class="font-medium">${sender.username}</p>
-          <p class="text-sm opacity-90">${message.content}</p>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(notification);
-
-    // Remover após 5 segundos
-    setTimeout(() => {
-      notification.remove();
-    }, 5000);
-
-    // Play sound
-    this.playNotificationSound();
-  }
-
-  private showSystemNotification(message: any, sender: any) {
-    if (Notification.permission !== 'granted') return;
-
-    const notification = new Notification(`Nova mensagem de ${sender.username}`, {
-      body: message.content,
-      icon: sender.avatar_url || '/default-avatar.png',
-      badge: '/notification-badge.png',
-      tag: `message-${message.id}`,
-      data: {
-        messageId: message.id,
-        senderId: sender.id,
-        conversationId: message.sender_id
+      // Fechar automaticamente após 5 segundos
+      setTimeout(() => nativeNotif.close(), 5000);
+    } else if (Notification.permission === 'default') {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        this.showNativeNotification(notification);
       }
-    });
+    }
+  }
 
-    notification.onclick = () => {
-      window.focus();
-      // Navegar para a conversa
-      window.location.hash = `#/chat/${sender.id}`;
-      notification.close();
+  markAsRead(notificationId: string) {
+    const notification = this.notifications.find(n => n.id === notificationId);
+    if (notification) {
+      notification.read = true;
+      this.saveNotifications();
+      this.notifyListeners();
+    }
+  }
+
+  markAllAsRead() {
+    this.notifications.forEach(n => n.read = true);
+    this.saveNotifications();
+    this.notifyListeners();
+  }
+
+  removeNotification(notificationId: string) {
+    this.notifications = this.notifications.filter(n => n.id !== notificationId);
+    this.saveNotifications();
+    this.notifyListeners();
+  }
+
+  clearAll() {
+    this.notifications = [];
+    this.saveNotifications();
+    this.notifyListeners();
+  }
+
+  subscribe(listener: (notifications: NotificationData[]) => void) {
+    this.listeners.push(listener);
+    listener(this.notifications);
+
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
-  private playNotificationSound() {
-    const audio = new Audio('/notification-sound.mp3');
-    audio.volume = 0.3;
-    audio.play().catch(() => {
-      // Falhou ao reproduzir som
+  private notifyListeners() {
+    this.listeners.forEach(listener => listener([...this.notifications]));
+  }
+
+  getUnreadCount(): number {
+    return this.notifications.filter(n => !n.read).length;
+  }
+
+  getNotifications(): NotificationData[] {
+    return [...this.notifications];
+  }
+
+  addMessageNotification(message: Message, sender: ChatUser) {
+    return this.addNotification({
+      title: sender.full_name || sender.username,
+      body: message.content.length > 100 
+        ? message.content.substring(0, 100) + '...' 
+        : message.content,
+      avatar: sender.avatar_url,
+      messageId: message.id,
+      senderId: message.sender_id,
+      conversationId: message.sender_id,
+      type: 'message'
     });
   }
 
-  private processNotificationQueue() {
-    // Processar notificações acumuladas enquanto estava em background
-    this.notificationQueue.forEach(({ message, sender }) => {
-      this.showInAppNotification(message, sender);
+  // Método para notificações do sistema
+  addSystemNotification(title: string, body: string) {
+    return this.addNotification({
+      title,
+      body,
+      type: 'system'
     });
-    this.notificationQueue = [];
-  }
-
-  private urlBase64ToUint8Array(base64String: string): Uint8Array {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
-
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  }
-
-  updateBadgeCount(count: number) {
-    if ('setAppBadge' in navigator) {
-      (navigator as any).setAppBadge(count > 0 ? count : 0);
-    }
   }
 }
 
-// Export singleton instance
-export const notificationService = NotificationService.getInstance();
+export const notificationService = new EnhancedNotificationService();

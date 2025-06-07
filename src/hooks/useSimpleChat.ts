@@ -1,10 +1,11 @@
+
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { Message, ChatUser, MessageType } from '@/types/messages';
-import { FileUploadService } from '@/services/FileUploadService';
-import { notificationService } from '@/services/NotificationService';
+import { FileUploadService } from '@/services/fileUploadService';
+import { notificationService } from '@/services/notificationService';
 
 export const useSimpleChat = () => {
   const [conversations, setConversations] = useState<ChatUser[]>([]);
@@ -37,14 +38,30 @@ export const useSimpleChat = () => {
 
         if (!profiles) return [];
 
+        // Count unread messages for each user
+        const unreadCounts = new Map<string, number>();
+        const { data: unreadMessages } = await supabase
+          .from('messages')
+          .select('sender_id, count')
+          .eq('recipient_id', user.id)
+          .eq('read', false)
+          .groupBy('sender_id');
+
+        if (unreadMessages) {
+          unreadMessages.forEach(msg => {
+            unreadCounts.set(msg.sender_id, parseInt(msg.count));
+          });
+        }
+
         const users: ChatUser[] = profiles.map(profile => ({
           id: profile.id,
           username: profile.username,
-          full_name: profile.full_name,
-          avatar_url: profile.avatar_url,
-          email: profile.email || '',
+          full_name: profile.full_name || undefined,
+          avatar_url: profile.avatar_url || undefined,
+          email: profile.email || undefined,
           created_at: profile.created_at,
-          updated_at: profile.updated_at
+          updated_at: profile.updated_at,
+          unread_count: unreadCounts.get(profile.id) || 0
         }));
 
         setConversations(users);
@@ -148,6 +165,9 @@ export const useSimpleChat = () => {
     getConversations,
     getConversationMessages,
     sendMessage,
-    markAsRead
+    markAsRead,
+    chatUsers: conversations,
+    isLoadingChatUsers: false,
+    getTotalUnreadCount: () => conversations.reduce((total, user) => total + user.unread_count, 0)
   };
 };

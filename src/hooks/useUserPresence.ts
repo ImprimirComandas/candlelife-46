@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -87,8 +86,31 @@ export const useUserPresence = () => {
     return presence.status;
   };
 
+  const isUserOnline = (userId: string): boolean => {
+    const status = getUserStatus(userId);
+    return status === 'online';
+  };
+
+  const getLastSeen = (userId: string): string | undefined => {
+    const presence = userStatuses.get(userId);
+    return presence?.last_seen;
+  };
+
+  const updateMyPresence = async (status: 'online' | 'offline' | 'away', currentConversation?: string) => {
+    if (!user) return;
+
+    await supabase.rpc('update_user_presence', { 
+      p_user_id: user.id,
+      p_status: status,
+      p_conversation_id: currentConversation
+    });
+  };
+
   return {
     userStatuses,
-    getUserStatus
+    getUserStatus,
+    isUserOnline,
+    getLastSeen,
+    updateMyPresence
   };
 };
