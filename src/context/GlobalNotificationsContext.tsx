@@ -1,20 +1,19 @@
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { useAuth } from './AuthContext';
-import { useNotificationSystem } from '@/hooks/useNotificationSystem';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { realtimeManager } from '@/services/RealtimeManager';
+import { useToast } from '@/hooks/use-toast';
 
 export type NotificationType = 
   | 'message' 
   | 'transaction' 
   | 'goal_achieved' 
   | 'payment_received' 
-  | 'client_added'
-  | 'system'
+  | 'client_added' 
+  | 'system' 
   | 'social';
 
-export interface GlobalNotification {
+export interface Notification {
   id: string;
   type: NotificationType;
   title: string;
@@ -22,7 +21,6 @@ export interface GlobalNotification {
   data?: any;
   read: boolean;
   created_at: string;
-  user_id: string;
 }
 
 export interface NotificationPreferences {
@@ -31,26 +29,25 @@ export interface NotificationPreferences {
   goals: boolean;
   payments: boolean;
   clients: boolean;
-  system: boolean;
   social: boolean;
+  system: boolean;
   sound_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
 }
 
 interface GlobalNotificationsContextType {
-  notifications: GlobalNotification[];
+  notifications: Notification[];
   unreadCount: number;
   preferences: NotificationPreferences;
-  isLoading: boolean;
   showNotification: (type: NotificationType, title: string, message: string, data?: any) => void;
   markAsRead: (notificationId: string) => void;
   markAllAsRead: () => void;
-  updatePreferences: (preferences: Partial<NotificationPreferences>) => void;
+  updatePreferences: (newPreferences: Partial<NotificationPreferences>) => Promise<void>;
   requestPermissions: () => Promise<boolean>;
 }
 
-const GlobalNotificationsContext = createContext<GlobalNotificationsContextType | undefined>(undefined);
+const GlobalNotificationsContext = createContext<GlobalNotificationsContextType | null>(null);
 
 const defaultPreferences: NotificationPreferences = {
   messages: true,
@@ -58,8 +55,8 @@ const defaultPreferences: NotificationPreferences = {
   goals: true,
   payments: true,
   clients: true,
-  system: true,
   social: true,
+  system: true,
   sound_enabled: true,
   quiet_hours_start: '22:00',
   quiet_hours_end: '08:00'
@@ -67,267 +64,214 @@ const defaultPreferences: NotificationPreferences = {
 
 export const GlobalNotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { handleNewMessage, requestPermissions, showPushNotification, playNotificationSound } = useNotificationSystem();
-  
-  const [notifications, setNotifications] = useState<GlobalNotification[]>([]);
+  const { toast } = useToast();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
-  const [isLoading, setIsLoading] = useState(true);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  // Load user preferences
+  // Load user preferences from localStorage
   useEffect(() => {
-    const loadPreferences = async () => {
-      if (!user) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('notification_preferences')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error loading preferences:', error);
-          return;
-        }
-
-        if (data) {
-          setPreferences({
-            messages: data.messages ?? true,
-            transactions: data.transactions ?? true,
-            goals: data.goals ?? true,
-            payments: data.payments ?? true,
-            clients: data.clients ?? true,
-            system: data.system ?? true,
-            social: data.social ?? true,
-            sound_enabled: data.sound_enabled ?? true,
-            quiet_hours_start: data.quiet_hours_start ?? '22:00',
-            quiet_hours_end: data.quiet_hours_end ?? '08:00'
-          });
-        }
-      } catch (error) {
-        console.error('Error loading preferences:', error);
+    if (user) {
+      const savedPreferences = localStorage.getItem(`notification_preferences_${user.id}`);
+      if (savedPreferences) {
+        setPreferences({ ...defaultPreferences, ...JSON.parse(savedPreferences) });
       }
-    };
-
-    loadPreferences();
+    }
   }, [user]);
 
-  // Load notifications
-  useEffect(() => {
-    const loadNotifications = async () => {
-      if (!user) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('user_notifications')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (error) {
-          console.error('Error loading notifications:', error);
-          return;
-        }
-
-        setNotifications(data || []);
-      } catch (error) {
-        console.error('Error loading notifications:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadNotifications();
-  }, [user]);
-
-  // Setup realtime subscriptions
+  // Setup realtime subscriptions for different notification types
   useEffect(() => {
     if (!user) return;
 
-    const setupRealtimeSubscriptions = () => {
-      // Subscribe to notifications
-      const notificationsUnsubscribe = realtimeManager.subscribe({
-        channelName: 'user-notifications',
-        filters: [
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'user_notifications',
-            filter: `user_id=eq.${user.id}`
-          }
-        ],
-        onSubscriptionChange: (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newNotification = payload.new as GlobalNotification;
-            setNotifications(prev => [newNotification, ...prev.slice(0, 49)]);
-            handleNotificationReceived(newNotification);
-          }
-        }
-      }, 'global-notifications');
+    const subscriptions: any[] = [];
 
-      // Subscribe to other relevant tables for automatic notifications
-      const transactionsUnsubscribe = realtimeManager.subscribe({
-        channelName: 'transactions-notifications',
-        filters: [
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'transactions',
-            filter: `user_id=eq.${user.id}`
+    // Subscribe to messages
+    if (preferences.messages) {
+      const messagesSubscription = supabase
+        .channel('messages_notifications')
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload) => {
+            if (payload.new && payload.new.sender_id !== user.id) {
+              showNotification(
+                'message',
+                'Nova mensagem',
+                'Você recebeu uma nova mensagem',
+                { messageId: payload.new.id, senderId: payload.new.sender_id }
+              );
+            }
           }
-        ],
-        onSubscriptionChange: (payload) => {
-          if (payload.eventType === 'INSERT' && preferences.transactions) {
-            const transaction = payload.new;
-            showNotification(
-              'transaction',
-              'Nova Transação',
-              `${transaction.type === 'income' ? 'Receita' : 'Despesa'} de R$ ${transaction.amount.toFixed(2)}`,
-              { transactionId: transaction.id }
-            );
+        )
+        .subscribe();
+      
+      subscriptions.push(messagesSubscription);
+    }
+
+    // Subscribe to transactions
+    if (preferences.transactions) {
+      const transactionsSubscription = supabase
+        .channel('transactions_notifications')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'transactions' },
+          (payload) => {
+            if (payload.new && payload.new.user_id === user.id) {
+              showNotification(
+                'transaction',
+                'Nova transação',
+                `Transação de R$ ${payload.new.amount} adicionada`,
+                { transactionId: payload.new.id }
+              );
+            }
           }
-        }
-      }, 'global-notifications-transactions');
+        )
+        .subscribe();
+      
+      subscriptions.push(transactionsSubscription);
+    }
 
-      unsubscribeRef.current = () => {
-        notificationsUnsubscribe();
-        transactionsUnsubscribe();
-      };
-    };
-
-    setupRealtimeSubscriptions();
+    // Subscribe to clients
+    if (preferences.clients) {
+      const clientsSubscription = supabase
+        .channel('clients_notifications')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'clients' },
+          (payload) => {
+            if (payload.new && payload.new.user_id === user.id) {
+              showNotification(
+                'client_added',
+                'Novo cliente',
+                `Cliente ${payload.new.name} foi adicionado`,
+                { clientId: payload.new.id }
+              );
+            }
+          }
+        )
+        .subscribe();
+      
+      subscriptions.push(clientsSubscription);
+    }
 
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
+      subscriptions.forEach(sub => {
+        supabase.removeChannel(sub);
+      });
     };
   }, [user, preferences]);
 
-  const isQuietHours = useCallback(() => {
+  const showNotification = useCallback((type: NotificationType, title: string, message: string, data?: any) => {
+    // Check if this type of notification is enabled
+    const typeKey = type === 'message' ? 'messages' : 
+                   type === 'transaction' ? 'transactions' :
+                   type === 'goal_achieved' ? 'goals' :
+                   type === 'payment_received' ? 'payments' :
+                   type === 'client_added' ? 'clients' :
+                   type === 'social' ? 'social' : 'system';
+    
+    if (!preferences[typeKey as keyof NotificationPreferences]) return;
+
+    // Check quiet hours
     const now = new Date();
-    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    const currentTime = now.toTimeString().slice(0, 5);
+    const quietStart = preferences.quiet_hours_start;
+    const quietEnd = preferences.quiet_hours_end;
     
-    const start = preferences.quiet_hours_start;
-    const end = preferences.quiet_hours_end;
+    const isQuietTime = quietStart > quietEnd ? 
+      (currentTime >= quietStart || currentTime <= quietEnd) :
+      (currentTime >= quietStart && currentTime <= quietEnd);
+
+    const notification: Notification = {
+      id: crypto.randomUUID(),
+      type,
+      title,
+      message,
+      data,
+      read: false,
+      created_at: new Date().toISOString()
+    };
+
+    setNotifications(prev => [notification, ...prev].slice(0, 100)); // Keep last 100 notifications
+
+    // Show toast notification if not in quiet hours
+    if (!isQuietTime) {
+      toast({
+        title,
+        description: message,
+      });
+
+      // Play sound if enabled
+      if (preferences.sound_enabled) {
+        try {
+          const audio = new Audio('/notification-sound.mp3');
+          audio.volume = 0.3;
+          audio.play().catch(() => {
+            // Ignore audio play errors
+          });
+        } catch (error) {
+          // Ignore audio errors
+        }
+      }
+    }
+
+    // Show browser notification if permission granted
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        const browserNotification = new Notification(title, {
+          body: message,
+          icon: '/favicon.ico',
+          tag: type,
+          requireInteraction: false,
+        });
+
+        setTimeout(() => browserNotification.close(), 5000);
+      } catch (error) {
+        // Ignore notification errors
+      }
+    }
+  }, [preferences, toast]);
+
+  const markAsRead = useCallback((notificationId: string) => {
+    setNotifications(prev => 
+      prev.map(notification => 
+        notification.id === notificationId 
+          ? { ...notification, read: true }
+          : notification
+      )
+    );
+  }, []);
+
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => 
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+  }, []);
+
+  const updatePreferences = useCallback(async (newPreferences: Partial<NotificationPreferences>) => {
+    const updatedPreferences = { ...preferences, ...newPreferences };
+    setPreferences(updatedPreferences);
     
-    if (start <= end) {
-      return currentTime >= start && currentTime <= end;
-    } else {
-      return currentTime >= start || currentTime <= end;
+    if (user) {
+      localStorage.setItem(`notification_preferences_${user.id}`, JSON.stringify(updatedPreferences));
     }
-  }, [preferences.quiet_hours_start, preferences.quiet_hours_end]);
+  }, [preferences, user]);
 
-  const handleNotificationReceived = useCallback(async (notification: GlobalNotification) => {
-    if (isQuietHours()) return;
-
-    // Show push notification
-    await showPushNotification(notification.title, notification.message, notification.data);
-
-    // Play sound if enabled
-    if (preferences.sound_enabled) {
-      await playNotificationSound();
-    }
-  }, [isQuietHours, showPushNotification, playNotificationSound, preferences.sound_enabled]);
-
-  const showNotification = useCallback(async (
-    type: NotificationType, 
-    title: string, 
-    message: string, 
-    data?: any
-  ) => {
-    if (!user) return;
-
-    // Check if this type is enabled in preferences
-    const typeEnabled = preferences[type === 'message' ? 'messages' : 
-                               type === 'transaction' ? 'transactions' :
-                               type === 'goal_achieved' ? 'goals' :
-                               type === 'payment_received' ? 'payments' :
-                               type === 'client_added' ? 'clients' :
-                               type === 'system' ? 'system' : 'social'];
-
-    if (!typeEnabled) return;
-
+  const requestPermissions = useCallback(async () => {
     try {
-      const { data: notification, error } = await supabase
-        .from('user_notifications')
-        .insert({
-          user_id: user.id,
-          type,
-          title,
-          message,
-          data,
-          read: false
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // The realtime subscription will handle adding to state
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        return permission === 'granted';
+      }
+      return false;
     } catch (error) {
-      console.error('Error creating notification:', error);
-    }
-  }, [user, preferences]);
-
-  const markAsRead = useCallback(async (notificationId: string) => {
-    try {
-      await supabase
-        .from('user_notifications')
-        .update({ read: true })
-        .eq('id', notificationId);
-
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('Failed to request notification permissions:', error);
+      return false;
     }
   }, []);
 
-  const markAllAsRead = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      await supabase
-        .from('user_notifications')
-        .update({ read: true })
-        .eq('user_id', user.id)
-        .eq('read', false);
-
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  }, [user]);
-
-  const updatePreferences = useCallback(async (newPreferences: Partial<NotificationPreferences>) => {
-    if (!user) return;
-
-    const updatedPreferences = { ...preferences, ...newPreferences };
-    setPreferences(updatedPreferences);
-
-    try {
-      await supabase
-        .from('notification_preferences')
-        .upsert({
-          user_id: user.id,
-          ...updatedPreferences
-        });
-    } catch (error) {
-      console.error('Error updating preferences:', error);
-    }
-  }, [user, preferences]);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const value: GlobalNotificationsContextType = {
     notifications,
     unreadCount,
     preferences,
-    isLoading,
     showNotification,
     markAsRead,
     markAllAsRead,
@@ -344,8 +288,8 @@ export const GlobalNotificationsProvider: React.FC<{ children: React.ReactNode }
 
 export const useGlobalNotifications = () => {
   const context = useContext(GlobalNotificationsContext);
-  if (context === undefined) {
-    throw new Error('useGlobalNotifications must be used within a GlobalNotificationsProvider');
+  if (!context) {
+    throw new Error('useGlobalNotifications must be used within GlobalNotificationsProvider');
   }
   return context;
 };
