@@ -62,17 +62,37 @@ export const useRealtimeMessages = ({
 
       const channel = realtimeConnectionManager.createChannel(channelName);
 
-      // Subscribe to messages
+      // Subscribe to sent messages
       channel.on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'messages',
-          filter: `or(sender_id.eq.${user.id},recipient_id.eq.${user.id})`
+          filter: `sender_id.eq.${user.id}`
         },
         (payload: any) => {
-          console.log('💬 Realtime message event:', payload);
+          console.log('💬 Sent message event:', payload);
+          if (payload.eventType === 'INSERT' && payload.new) {
+            queryClient.invalidateQueries({ queryKey: messageKeys.chatUsers() });
+            queryClient.invalidateQueries({ 
+              queryKey: messageKeys.conversation(payload.new.recipient_id) 
+            });
+          }
+        }
+      );
+
+      // Subscribe to received messages
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `recipient_id.eq.${user.id}`
+        },
+        (payload: any) => {
+          console.log('💬 Received message event:', payload);
           
           if (payload.eventType === 'INSERT' && payload.new) {
             console.log('📩 New message received:', payload.new);
@@ -80,24 +100,14 @@ export const useRealtimeMessages = ({
             
             // Invalidate queries
             queryClient.invalidateQueries({ queryKey: messageKeys.chatUsers() });
-            
-            const otherUserId = payload.new.sender_id === user.id 
-              ? payload.new.recipient_id 
-              : payload.new.sender_id;
-            
             queryClient.invalidateQueries({ 
-              queryKey: messageKeys.conversation(otherUserId) 
+              queryKey: messageKeys.conversation(payload.new.sender_id) 
             });
           } else if (payload.eventType === 'UPDATE' && payload.new) {
             console.log('📝 Message updated:', payload.new);
             onMessageUpdate?.(payload.new as Message);
-            
-            const otherUserId = payload.new.sender_id === user.id 
-              ? payload.new.recipient_id 
-              : payload.new.sender_id;
-              
             queryClient.invalidateQueries({ 
-              queryKey: messageKeys.conversation(otherUserId) 
+              queryKey: messageKeys.conversation(payload.new.sender_id) 
             });
           }
         }
