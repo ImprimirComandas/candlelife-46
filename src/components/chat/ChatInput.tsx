@@ -2,11 +2,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Paperclip, X } from "lucide-react";
-import { AttachmentUpload } from "@/components/social/chat/AttachmentUpload";
+import { Send } from "lucide-react";
 
 interface ChatInputProps {
-  onSendMessage: (message: string, file?: File | null) => Promise<void>;
+  onSendMessage: (message: string) => Promise<void>;
   onTypingStatusChange: (isTyping: boolean) => void;
   isSubmitting: boolean;
 }
@@ -17,7 +16,6 @@ export const ChatInput = ({
   isSubmitting
 }: ChatInputProps) => {
   const [message, setMessage] = useState("");
-  const [attachment, setAttachment] = useState<File | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
@@ -34,12 +32,12 @@ export const ChatInput = ({
       clearTimeout(typingTimeoutRef.current);
     }
 
-    // Set timeout to stop typing status after 3 seconds of inactivity
+    // Set timeout to stop typing status after 2 seconds of inactivity
     if (typing) {
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
         onTypingStatusChange(false);
-      }, 3000);
+      }, 2000);
     }
   };
 
@@ -51,14 +49,13 @@ export const ChatInput = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if ((!message.trim() && !attachment) || isSubmitting) {
+    if (!message.trim() || isSubmitting) {
       return;
     }
 
     try {
-      await onSendMessage(message, attachment);
+      await onSendMessage(message.trim());
       setMessage("");
-      setAttachment(null);
       handleTypingChange(false);
       
       // Focus back to textarea after sending
@@ -75,10 +72,6 @@ export const ChatInput = ({
     }
   };
 
-  const removeAttachment = () => {
-    setAttachment(null);
-  };
-
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
@@ -89,22 +82,7 @@ export const ChatInput = ({
   }, []);
 
   return (
-    <div className="border-t p-4 space-y-3">
-      {attachment && (
-        <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-          <Paperclip className="h-4 w-4" />
-          <span className="text-sm truncate flex-1">{attachment.name}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={removeAttachment}
-            className="h-6 w-6 p-0"
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      )}
-      
+    <div className="border-t p-4 bg-background">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <div className="flex-1">
           <Textarea
@@ -113,23 +91,19 @@ export const ChatInput = ({
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Digite sua mensagem..."
-            className="min-h-[40px] max-h-[120px] resize-none"
+            className="min-h-[44px] max-h-[120px] resize-none"
             disabled={isSubmitting}
           />
         </div>
         
-        <div className="flex flex-col gap-1">
-          <AttachmentUpload onFileSelect={setAttachment} />
-          
-          <Button
-            type="submit"
-            size="sm"
-            disabled={(!message.trim() && !attachment) || isSubmitting}
-            className="h-10"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!message.trim() || isSubmitting}
+          className="h-11 w-11 p-0"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
       </form>
     </div>
   );

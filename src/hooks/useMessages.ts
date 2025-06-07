@@ -8,10 +8,8 @@ import { messageKeys } from '@/lib/query-keys';
 import { 
   Message, 
   ChatUser, 
-  ConversationSettings, 
   MessageStatus,
-  MessageType,
-  PaginatedMessages
+  MessageType
 } from '@/types/messages';
 
 interface UseMessagesConfig {
@@ -100,7 +98,6 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
               read: lastMessageData[0].read || false,
               message_status: MessageStatus.SENT,
               message_type: MessageType.TEXT,
-              attachment_url: lastMessageData[0].attachment_url,
               deleted_by_recipient: false,
               reactions: []
             } as Message : undefined;
@@ -133,14 +130,14 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         }
       },
       enabled: !!user,
-      staleTime: 5000, // Reduced for more frequent updates
+      staleTime: 5000,
       refetchOnWindowFocus: true,
       retry: 2,
       retryDelay: 1000,
     });
   };
 
-  // Get conversation messages with better error handling
+  // Get conversation messages
   const useConversation = (otherUserId: string, searchTerm?: string) => {
     return useQuery({
       queryKey: messageKeys.conversationWithSearch(otherUserId, searchTerm),
@@ -177,7 +174,6 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
             read: msg.read || false,
             message_status: MessageStatus.SENT,
             message_type: MessageType.TEXT,
-            attachment_url: msg.attachment_url,
             deleted_by_recipient: false,
             reactions: []
           })).reverse();
@@ -197,23 +193,17 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     });
   };
 
-  // Send message with better error handling
+  // Send message (text only)
   const useSendMessage = () => useMutation({
     mutationFn: async ({ 
       recipientId, 
-      content, 
-      attachmentUrl,
-      fileName,
-      fileSize
+      content
     }: { 
       recipientId: string; 
       content: string; 
-      attachmentUrl?: string;
-      fileName?: string;
-      fileSize?: number;
     }) => {
       if (!user) throw new Error('User not authenticated');
-      if (!content.trim() && !attachmentUrl) throw new Error('Content or attachment required');
+      if (!content.trim()) throw new Error('Message content is required');
 
       console.log('📤 Sending message:', { recipientId, content: content.substring(0, 50) + '...' });
 
@@ -222,8 +212,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
         .insert({
           sender_id: user.id,
           recipient_id: recipientId,
-          content: content.trim(),
-          attachment_url: attachmentUrl
+          content: content.trim()
         })
         .select()
         .single();
@@ -364,7 +353,7 @@ export const useMessages = (config: UseMessagesConfig = {}) => {
     }
   });
 
-  // Show notification
+  // Show notification (simplified)
   const showNotification = useCallback(async (message: Message) => {
     if (!('Notification' in window)) return;
 

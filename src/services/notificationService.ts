@@ -14,55 +14,12 @@ export interface NotificationData {
   type: 'message' | 'system' | 'transaction';
 }
 
-class EnhancedNotificationService {
+class SimpleNotificationService {
   private notifications: NotificationData[] = [];
   private listeners: ((notifications: NotificationData[]) => void)[] = [];
-  private audioContext: AudioContext | null = null;
 
   constructor() {
-    this.initializeAudio();
     this.loadStoredNotifications();
-  }
-
-  initialize() {
-    // Initialize method for compatibility
-    this.initializeAudio();
-  }
-
-  private async initializeAudio() {
-    try {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch (error) {
-      console.warn('Web Audio API não suportado:', error);
-    }
-  }
-
-  private playBellSound() {
-    if (!this.audioContext) return;
-
-    try {
-      const oscillator1 = this.audioContext.createOscillator();
-      const oscillator2 = this.audioContext.createOscillator();
-      const gainNode = this.audioContext.createGain();
-      
-      oscillator1.connect(gainNode);
-      oscillator2.connect(gainNode);
-      gainNode.connect(this.audioContext.destination);
-      
-      oscillator1.frequency.setValueAtTime(800, this.audioContext.currentTime);
-      oscillator2.frequency.setValueAtTime(1000, this.audioContext.currentTime);
-      
-      gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.8);
-      
-      oscillator1.start(this.audioContext.currentTime);
-      oscillator2.start(this.audioContext.currentTime);
-      oscillator1.stop(this.audioContext.currentTime + 0.8);
-      oscillator2.stop(this.audioContext.currentTime + 0.8);
-    } catch (error) {
-      console.warn('Erro ao reproduzir som:', error);
-    }
   }
 
   private loadStoredNotifications() {
@@ -100,7 +57,6 @@ class EnhancedNotificationService {
 
     this.saveNotifications();
     this.notifyListeners();
-    this.playBellSound();
     this.showNativeNotification(newNotification);
 
     return newNotification;
@@ -112,8 +68,8 @@ class EnhancedNotificationService {
     if (Notification.permission === 'granted') {
       const nativeNotif = new Notification(notification.title, {
         body: notification.body,
-        icon: notification.avatar || '/notification-badge.png',
-        badge: '/notification-badge.png',
+        icon: notification.avatar || '/favicon.ico',
+        badge: '/favicon.ico',
         tag: notification.id
       });
 
@@ -206,4 +162,4 @@ class EnhancedNotificationService {
   }
 }
 
-export const notificationService = new EnhancedNotificationService();
+export const notificationService = new SimpleNotificationService();
